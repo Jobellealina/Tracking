@@ -6,6 +6,8 @@
 <title>JKM PRIME DIGITAL PRINTS - Project Tracker</title>
 <link rel="icon" href="logo.png" type="image/png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- SweetAlert2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.min.css" rel="stylesheet">
 <style>
 body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:.3s}
 .dark{background:#1e293b;color:white}
@@ -86,7 +88,7 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 <td><input type="number" id="qty"></td>
 <td>-</td>
 <td><input type="number" id="price"></td>
-<td><button class="btn btn-primary btn-sm" onclick="addMaterial()">ADD</button></td>
+<td><button class="btn btn-primary btn-sm" onclick="addMaterial(); return false;">ADD</button></td>
 </tr>
 </tbody>
 <tbody id="tbody"></tbody>
@@ -109,7 +111,48 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 </div>
 
 <div class="mt-3">
-<button class="btn btn-success w-100" onclick="saveProject()">SAVE PROJECT</button>
+<button class="btn btn-success w-100" onclick="saveProject(); return false;">SAVE PROJECT</button>
+</div>
+</div>
+</div>
+
+<!-- SRP TAB -->
+<div id="srpTab" style="display:none">
+<div class="card p-3">
+<h5>SRP Computation</h5>
+
+<div class="table-responsive">
+<table class="table table-bordered text-center">
+<thead>
+<tr>
+<th>Material</th>
+<th>Qty Needed</th>
+<th>Price / unit</th>
+<th>Total</th>
+<th>Add</th>
+</tr>
+</thead>
+<tbody>
+<tr class="inputRow">
+<td><input type="text" id="srpMaterial"></td>
+<td><input type="number" id="srpQty"></td>
+<td><input type="number" id="srpPrice"></td>
+<td>-</td>
+<td><button class="btn btn-primary btn-sm" onclick="addSRP(); return false;">ADD</button></td>
+</tr>
+</tbody>
+<tbody id="srpBody"></tbody>
+</table>
+</div>
+
+<div class="mt-3 totalWrapper">
+<div class="totalLabel">TOTAL MATERIAL COST</div>
+<div class="totalValue">₱ <span id="srpTotal">0</span></div>
+</div>
+
+<div class="mt-2 totalWrapper">
+<div class="totalLabel">Suggested SRP</div>
+<div class="totalValue">₱ <span id="srpSuggested">0</span></div>
 </div>
 </div>
 </div>
@@ -168,10 +211,12 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
   </div>
 </div>
 
-<!-- Firebase & Bootstrap -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-database.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SweetAlert2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.all.min.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -188,82 +233,130 @@ const database = firebase.database();
 </script>
 
 <script>
-let materials=[], totalCost=0, projectHistory=[];
+let materials=[], totalCost=0, projectHistory=[], srpMaterials=[];
+let confirmCallback=null;
+
 const tbody=document.getElementById("tbody");
 const totalCostSpan=document.getElementById("totalCost");
 const profitSpan=document.getElementById("profit");
 const history=document.getElementById("history");
-const income=document.getElementById("income");
+const incomeInput=document.getElementById("income");
 const projectName=document.getElementById("projectName");
+const srpBody=document.getElementById("srpBody");
+const srpTotalSpan=document.getElementById("srpTotal");
+const srpSuggestedSpan=document.getElementById("srpSuggested");
 
-// Toast
 function showToast(msg,type='info'){const t=document.getElementById('toast'); t.innerText=msg; t.style.background=type==='error'?'#dc3545':type==='success'?'#198754':'#0d6efd'; t.style.display='block'; setTimeout(()=>{t.style.display='none'},3000);}
+function showTab(e,tab){e.preventDefault(); document.getElementById('materialsTab').style.display=tab==='materials'?'block':'none'; document.getElementById('srpTab').style.display=tab==='srp'?'block':'none'; document.querySelectorAll('#tabMenu .nav-link').forEach(n=>n.classList.remove('active')); e.currentTarget.classList.add('active');}
 
-// Tabs
-function showTab(e,tab){e.preventDefault(); document.getElementById('materialsTab').style.display=tab==='materials'?'block':'none'; document.querySelectorAll('#tabMenu .nav-link').forEach(n=>n.classList.remove('active')); e.currentTarget.classList.add('active');}
-
-// Materials
+// MATERIALS
 function render(){let html="", tc=0; materials.forEach((m,i)=>{let totalQty=m.packs*m.qty; tc+=m.price; html+=`<tr><td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${totalQty}</td><td>₱${m.price.toLocaleString()}</td><td><button class="btn btn-danger btn-sm" onclick="delMaterial(${i})">Delete</button></td></tr>`}); tbody.innerHTML=html; totalCost=tc; totalCostSpan.innerText=totalCost.toLocaleString(); computeProfit();}
 function addMaterial(){let m={name:document.getElementById("material").value,packs:Number(document.getElementById("packs").value),qty:Number(document.getElementById("qty").value),price:Number(document.getElementById("price").value)}; if(!m.name||!m.packs||!m.qty||!m.price){showToast("Complete all fields","error"); return;} materials.push(m); render(); document.getElementById("material").value=""; document.getElementById("packs").value=""; document.getElementById("qty").value=""; document.getElementById("price").value="";}
 function delMaterial(i){materials.splice(i,1); render();}
-function computeProfit(){let incomeVal=Number(income.value)||0; profitSpan.innerText=(incomeVal-totalCost).toLocaleString();}
+function computeProfit(){let incomeVal=Number(incomeInput.value)||0; profitSpan.innerText=(incomeVal-totalCost).toLocaleString();}
 
-// Save Project
-function saveProject(){
-  if(materials.length===0){showToast("Add materials first","error"); return;}
-  let name=projectName.value||"Unnamed Project";
-  let incomeVal=Number(income.value)||0;
-  let profit=incomeVal-totalCost;
-  let date=new Date().toISOString();
-  let projectObj={date,name,totalCost,incomeVal,profit,materials:JSON.parse(JSON.stringify(materials))};
-  
+// SAVE PROJECT WITH SWEETALERT
+function saveProject() {
+  if (materials.length === 0) {
+    showToast("Add materials first", "error");
+    return;
+  }
+
+  let name = projectName.value || "Unnamed Project";
+  let incomeVal = Number(incomeInput.value) || 0;
+  let date = new Date().toISOString();
+  let projectObj = {
+    date,
+    name,
+    totalCost,
+    incomeVal,
+    profit: incomeVal - totalCost,
+    materials: JSON.parse(JSON.stringify(materials))
+  };
+
+  // Save locally first
+  projectHistory.push(projectObj);
+  localStorage.setItem("projects", JSON.stringify(projectHistory));
+  renderHistory();
+
+  // SweetAlert showing only project name
+  Swal.fire({
+    icon: 'success',
+    title: 'Project Saved!',
+    text: name,
+    timer: 2000,
+    showConfirmButton: false
+  });
+
+  // Toast notification
+  showToast(`Project "${name}" saved!`, "success");
+
+  // Save to Firebase asynchronously
   database.ref('trackingProjects').push(projectObj)
-  .then(()=>{
-    materials=[]; render(); projectName.value=""; income.value="";
-    showToast("Project saved","success");
-  }).catch(err=>showToast("Firebase error: "+err.message,"error"));
-}
+    .then(() => console.log("Firebase: Project saved"))
+    .catch(err => showToast("Firebase error: " + err.message, "error"));
 
-// Render History
+  // Clear form
+  materials = [];
+  render();
+  projectName.value = "";
+  incomeInput.value = "";
+}
+// HISTORY FUNCTIONS
 function renderHistory(){
   let html="";
-  projectHistory.forEach((h,idx)=>{
-    html+=`<tr>
-<td>${new Date(h.date).toLocaleString()}</td><td>${h.name}</td><td>₱${h.totalCost.toLocaleString()}</td><td>₱${h.incomeVal.toLocaleString()}</td><td>₱${h.profit.toLocaleString()}</td>
-<td><button class="btn btn-info btn-sm" onclick="viewProject(${idx})">View</button></td></tr>`;
-  });
+  projectHistory.forEach((h,idx)=>{ html+=`<tr>
+<td>${new Date(h.date).toLocaleString()}</td><td>${h.name}</td><td>₱${h.totalCost.toLocaleString()}</td>
+<td>₱${h.incomeVal.toLocaleString()}</td><td>₱${h.profit.toLocaleString()}</td>
+<td>
+<button class="btn btn-info btn-sm" onclick="viewProject(${idx})">View</button>
+<button class="btn btn-warning btn-sm" onclick="editProject(${idx})">Edit</button>
+<button class="btn btn-danger btn-sm" onclick="deleteProject(${idx})">Delete</button>
+</td></tr>`});
   history.innerHTML=html;
 }
 
-// View Project Modal
 function viewProject(idx){
   const modal = new bootstrap.Modal(document.getElementById('materialsModal'));
-  const tbodyModal = document.querySelector('#modalMaterialsTable tbody');
-  tbodyModal.innerHTML="";
+  const tbody = document.querySelector('#modalMaterialsTable tbody');
+  tbody.innerHTML="";
   projectHistory[idx].materials.forEach(m=>{
     let tr=document.createElement('tr');
     tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`;
-    tbodyModal.appendChild(tr);
+    tbody.appendChild(tr);
   });
   modal.show();
 }
 
-// Dark Mode
+function editProject(idx){const p=projectHistory[idx]; projectName.value=p.name; incomeInput.value=p.incomeVal; materials=JSON.parse(JSON.stringify(p.materials)); render();}
+function deleteProject(idx){showConfirm("Are you sure?", r=>{if(r){projectHistory.splice(idx,1); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory(); showToast("Deleted","success");}});}
+
+// DARK MODE
 function toggleDark(){document.body.classList.toggle('dark');}
 
-// Load projects and listen real-time
-function loadProjectsRealtime(){
-  database.ref('trackingProjects').on('value', snap=>{
-    projectHistory = [];
+// CONFIRM
+function showConfirm(msg,cb){document.getElementById('confirmMessage').innerText=msg; document.getElementById('confirmModal').style.display='flex'; confirmCallback=cb;}
+function confirmYes(){document.getElementById('confirmModal').style.display='none'; if(confirmCallback) confirmCallback(true);}
+function confirmNo(){document.getElementById('confirmModal').style.display='none'; if(confirmCallback) confirmCallback(false);}
+
+// SRP
+function addSRP(){ let m={name:document.getElementById("srpMaterial").value, qty:Number(document.getElementById("srpQty").value), price:Number(document.getElementById("srpPrice").value)}; if(!m.name||!m.qty||!m.price){showToast("Complete SRP","error"); return;} srpMaterials.push(m); renderSRP(); document.getElementById("srpMaterial").value=""; document.getElementById("srpQty").value=""; document.getElementById("srpPrice").value="";}
+function renderSRP(){ let html="", tc=0; srpMaterials.forEach((m,i)=>{let total=m.qty*m.price; tc+=total; html+=`<tr><td>${m.name}</td><td>${m.qty}</td><td>₱${m.price}</td><td>₱${total}</td><td><button class="btn btn-danger btn-sm" onclick="delSRP(${i})">Delete</button></td></tr>`; }); srpBody.innerHTML=html; srpTotalSpan.innerText=tc.toLocaleString(); srpSuggestedSpan.innerText=(tc*3).toLocaleString();}
+function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
+
+// LOAD PROJECTS
+function loadProjects(){
+  projectHistory = JSON.parse(localStorage.getItem("projects")||"[]");
+  renderHistory();
+  database.ref('trackingProjects').once('value').then(snap=>{
     const data = snap.val();
     if(data){ Object.values(data).forEach(p=>{
-      projectHistory.push(p);
+      if(!projectHistory.some(lp=>lp.date===p.date && lp.name===p.name)) projectHistory.push(p);
     }); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory();}
-  });
+  }).catch(console.log);
 }
 
-loadProjectsRealtime();
-render();
+loadProjects(); render(); renderSRP();
 </script>
 </body>
 </html>
