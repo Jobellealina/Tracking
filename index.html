@@ -884,6 +884,174 @@ window.addEventListener('load',()=>{
   });
 });
 
+// ================= DASHBOARD GRAPHS =================
+
+// Chart instances
+let barChartInstance, lineChartInstance;
+
+// Function to render both charts
+function renderCharts() {
+  const barCtx = document.getElementById("salesBarChart").getContext("2d");
+  const lineCtx = document.getElementById("salesLineChart").getContext("2d");
+
+  // Prepare labels (dates) and data (total sales)
+  const labels = receiptHistory.map(r => r.date);
+  const data = receiptHistory.map(r => Number(r.total) || 0);
+
+  // Destroy previous charts if exist
+  if (barChartInstance) barChartInstance.destroy();
+  if (lineChartInstance) lineChartInstance.destroy();
+
+  // ---- Bar Chart ----
+  barChartInstance = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Sales',
+        data: data,
+        backgroundColor: '#2563eb'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  // ---- Line Chart ----
+  lineChartInstance = new Chart(lineCtx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Sales Trend',
+        data: data,
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.2)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true, position: 'top' },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+// Call renderCharts() whenever receiptHistory updates
+function updateDashboard() {
+  const todayStr = new Date().toLocaleDateString();
+  const currentMonth = new Date().getMonth() + 1;
+
+  let dailySales = 0, dailyProfit = 0, monthlySales = 0, monthlyProfit = 0;
+
+  receiptHistory.forEach(r => {
+    const rDate = new Date(r.date);
+    const rTotal = Number(r.total) || 0;
+    const rProfit = rTotal * 0.45; // 45% assumed profit
+
+    // Daily
+    if (r.date === todayStr) {
+      dailySales += rTotal;
+      dailyProfit += rProfit;
+    }
+
+    // Monthly
+    if (rDate.getMonth() + 1 === currentMonth) {
+      monthlySales += rTotal;
+      monthlyProfit += rProfit;
+    }
+  });
+
+  // Update dashboard cards
+  document.getElementById("dailySales").innerText = dailySales;
+  document.getElementById("dailyProfit").innerText = dailyProfit;
+  document.getElementById("monthlySales").innerText = monthlySales;
+  document.getElementById("monthlyProfit").innerText = monthlyProfit;
+
+  // Render charts
+  renderCharts();
+}
+
+// ================= POPULATE SERVICES =================
+
+// List of services with prices
+const services = [
+  { name: "3R Photo Print", price: 20 },
+  { name: "4R Photo Print", price: 25 },
+  { name: "5R Photo Print", price: 30 },
+  { name: "A4 Photo Print", price: 60 },
+  { name: "Polaroid Photo Print", price: 60 },
+  { name: "Rush ID Package 1", price: 35 },
+  { name: "Rush ID Package 2", price: 50 },
+  { name: "Rush ID Package 3", price: 45 },
+  { name: "Rush ID Package 4", price: 45 },
+  { name: "Rush ID Package 5", price: 65 },
+  { name: "Typing Job", price: 50 },
+  { name: "Document Print Short", price: 7 },
+  { name: "Document Print A4", price: 8 },
+  { name: "Document Print Long", price: 10 },
+  { name: "Desk Calendar", price: 150 },
+  { name: "A4 Sintra Board", price: 140 },
+  { name: "A3 Sintra Board", price: 290 },
+  { name: "B5 Notebook Chipboard Cover", price: 199 },
+  { name: "A5 Notebook Chipboard Cover", price: 95 },
+  { name: "A5 Notebook Photo Paper Cover", price: 85 },
+  { name: "Composition Notebook", price: 69 }
+];
+
+// Populate Add Receipt select and Quotation select
+function populateServices() {
+  const receiptSelect = document.getElementById("item");
+  const quotationSelect = document.getElementById("qItemSelect");
+
+  receiptSelect.innerHTML = '<option value="">Select Service</option>';
+  quotationSelect.innerHTML = '<option value="">Select Service</option>';
+
+  services.forEach(service => {
+    const optionReceipt = document.createElement("option");
+    optionReceipt.value = service.name;
+    optionReceipt.dataset.price = service.price;
+    optionReceipt.textContent = `${service.name} - ₱${service.price}`;
+    receiptSelect.appendChild(optionReceipt);
+
+    const optionQuote = document.createElement("option");
+    optionQuote.value = service.name;
+    optionQuote.dataset.price = service.price;
+    optionQuote.textContent = `${service.name} - ₱${service.price}`;
+    quotationSelect.appendChild(optionQuote);
+  });
+}
+
+// Automatically call on page load
+populateServices();
+
+// Update price field when a service is selected (Add Receipt)
+document.getElementById("item").addEventListener("change", function () {
+  const selectedPrice = this.selectedOptions[0].dataset.price || 0;
+  document.getElementById("price").value = selectedPrice;
+});
+
+// Update unit price when a service is selected (Quotation)
+document.getElementById("qItemSelect").addEventListener("change", function () {
+  const selectedPrice = this.selectedOptions[0].dataset.price || 0;
+  document.getElementById("qUnitPrice").value = selectedPrice;
+});
+
 // Load projects from Firebase on page load
 function fetchProjectsFromFirebase(){
   const ref = db.ref('trackingProjects');
