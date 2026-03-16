@@ -345,18 +345,20 @@ function renderSRP(){ let html="", tc=0; srpMaterials.forEach((m,i)=>{let total=
 function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
 
 // LOAD PROJECTS
-function loadProjects(){
-  // 1. Load projects from Firebase
-  database.ref('trackingProjects').once('value').then(snap=>{
-    const data = snap.val();
-    if(data){
-      projectHistory = Object.values(data); // replace localStorage with Firebase data
-      localStorage.setItem("projects", JSON.stringify(projectHistory)); // optional cache
+function loadProjects() {
+  projectHistory = []; // start empty
+
+  // Listen to Firebase in real-time
+  database.ref('trackingProjects').on('child_added', snap => {
+    const project = snap.val();
+
+    // Check if it's already in projectHistory (avoid duplicates)
+    if (!projectHistory.some(p => p.date === project.date && p.name === project.name)) {
+      projectHistory.push(project);
       renderHistory();
     }
-  }).catch(console.log);
+  });
 }
-
 loadProjects(); render(); renderSRP();
 </script>
 </body>
