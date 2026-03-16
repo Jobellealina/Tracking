@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.21.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -42,8 +43,6 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
 .print-header p { margin-top:5px; margin-bottom:2px; text-align:left; }
 .print-header strong { display:block; text-align:center; }
 @media(max-width:768px){
-.history-table-wrapper table{ min-width:600px; }
-.history-table-wrapper th, .history-table-wrapper td{ text-align:left !important; }
 .sidebar { width:80px; padding:0.5rem 0; }
 .sidebar a { justify-content:center; padding:10px 0; flex-direction:column; font-size:11px; }
 .sidebar h5 { display:none; }
@@ -55,12 +54,6 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
 }
 @media print { body * { visibility:hidden; } .print-area, .print-area * { visibility:visible; } .print-area { position:absolute; left:0; top:0; width:105mm; font-size:15px; } }
 .tab-content > .tab-pane { min-height: calc(100vh - 2rem); overflow-y:auto; }
-.modal-left label{display:block; font-size:12px; margin-top:5px; font-weight:500;}
-.modal-left input, .modal-left select{width:100%; font-size:12px; margin-top:2px; padding:6px; border-radius:6px; border:1px solid #ccc;}
-.modal-left .modal-footer{display:flex; justify-content:flex-start; gap:10px; padding:5px;}
-.modal-left {padding:10px;}
-.modal-left h5 {margin-bottom:10px; font-size:16px; text-align:left;}
-.totalWrapper{display:flex; justify-content:space-between; padding:5px; font-weight:600;}
 </style>
 </head>
 <body>
@@ -83,7 +76,7 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
 <div class="main-content">
 <div class="tab-content">
 
-<!-- Dashboard Tab -->
+<!-- Dashboard -->
 <div class="tab-pane fade show active" id="dashboardTab">
 <div class="dashboard-columns mb-3 d-flex flex-wrap gap-2">
 <div class="card p-3 bg-secondary text-white" style="width: 300px;"> <h6>Daily Sales</h6><h5>₱ <span id="dailySales">0</span></h5></div>
@@ -103,30 +96,145 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
 </div>
 </div>
 
-<!-- Add Receipt Tab -->
+<!-- Add Receipt -->
 <div class="tab-pane fade" id="receiptTab">
-<!-- your receipt HTML here (unchanged for brevity) -->
+<div class="row">
+<div class="col-md-6">
+<div class="card p-3 mb-3">
+<h5>Add Service</h5>
+<div class="row g-2 mb-2">
+<div class="col-md-5"><select id="item" class="form-select"></select></div>
+<div class="col-md-2"><input type="number" id="qty" value="1" class="form-control"></div>
+<div class="col-md-3"><input type="number" id="price" class="form-control"></div>
+<div class="col-md-2"><button class="btn btn-blue btn-professional" onclick="addItem()">Add</button></div>
+</div>
+<input type="text" placeholder="Customer Name" id="custName" class="form-control mb-1">
+<input type="text" placeholder="Address" id="custAddress" class="form-control mb-1">
+<select id="paymentMethod" class="form-select mb-1">
+<option>Cash</option><option>GCash</option><option>Bank Transfer</option>
+</select>
+<select id="paymentType" class="form-select mb-1" onchange="toggleDownpayment()">
+<option value="Full Payment">Full Payment</option>
+<option value="Downpayment">Downpayment</option>
+</select>
+<input type="number" id="downpaymentAmount" placeholder="Downpayment Amount" class="form-control mb-1" style="display:none;">
+<div class="mt-2 d-flex gap-1 flex-wrap">
+<button class="btn btn-green btn-professional" onclick="saveReceipt()">Save</button>
+<button class="btn btn-green btn-professional" onclick="printReceipt()">Print</button>
+<button class="btn btn-red btn-professional" onclick="undoItem()">Undo</button>
+</div>
+</div>
 </div>
 
-<!-- History Tab -->
+<div class="col-md-6">
+<div id="receiptPreview" class="print-area">
+<img src="Watermark.png" class="watermark">
+<div class="print-header mb-2">
+<img src="logo.png" width="50" class="d-block mx-auto">
+<strong>JKM PRIME DIGITAL PRINTS <br> Printing Services</strong><br>
+<p>Name: <span id="rNamePrint"></span></p>
+<p>Address: <span id="rAddressPrint"></span></p>
+<p>Date: <span id="rDatePrint"></span></p>
+<p>Receipt No.: <span id="rNoPrint"></span></p>
+<p>MOP: <span id="rPaymentPrint"></span></p>
+<p><span id="rPaymentTypePrint"></span></p>
+</div>
+<div style="overflow-x:auto;">
+<table class="table table-sm" id="previewTable">
+<thead>
+<tr style="border-bottom: 1px solid #b5c6eb; border-top: 1px solid #b5c6eb;">
+<th>No</th><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th><th>Total</th>
+</tr>
+</thead>
+<tbody><tr style="height:7px;"></tr></tbody>
+<tfoot>
+<tr style="height:25px;"></tr>
+<tr>
+<th colspan="5" style="text-align:right;">TOTAL</th>
+<th id="grandTotal">₱0</th>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- History -->
 <div class="tab-pane fade" id="historyTab">
-<!-- your history HTML here -->
+<div class="card p-3">
+<h5 style="color:#7995f2;">Receipt History</h5>
+<div class="row mb-2">
+<div class="col-md-3"><input type="date" id="fromDate" class="form-control" placeholder="From Date"></div>
+<div class="col-md-3"><input type="date" id="toDate" class="form-control" placeholder="To Date"></div>
+<div class="col-md-3"><input type="text" id="searchInput" class="form-control" placeholder="Search Name or Receipt No."></div>
+<div class="col-md-3"><button class="btn btn-blue btn-professional" onclick="applyFilters()">Filter</button></div>
+</div>
+<div class="history-table-wrapper">
+<table class="table table-sm" id="historyTable">
+<thead>
+<tr>
+<th>No</th><th>Receipt</th><th>Date</th><th>Customer</th><th>Sales</th><th>Profit</th><th>Payment Type</th><th>Action</th>
+</tr>
+</thead>
+<tbody id="receiptHistory"></tbody>
+</table>
+</div>
+<div class="mb-2">
+<button class="btn btn-blue btn-professional" onclick="exportToExcel()">Excel</button>
+<button class="btn btn-red btn-professional" onclick="exportToPDF()">PDF</button>
+</div>
+</div>
 </div>
 
-<!-- Quotation Tab -->
+<!-- Quotation -->
 <div class="tab-pane fade" id="quotationTab">
-<!-- your quotation HTML here -->
+<div class="row">
+<div class="col-md-6">
+<div class="card p-3 mb-3">
+<h5>Create Quotation</h5>
+<input type="text" placeholder="Customer Name" id="qCustName" class="form-control mb-1">
+<select id="qItemSelect" class="form-select mb-1"></select>
+<input type="number" placeholder="Quantity" id="qQty" class="form-control mb-1">
+<input type="number" placeholder="Unit Price" id="qUnitPrice" class="form-control mb-1">
+<div class="mt-2 d-flex gap-1 flex-wrap">
+<button class="btn btn-blue btn-professional" onclick="generateQuotation()">Generate</button>
+<button class="btn btn-green btn-professional" onclick="downloadQuotationPDF()">Download PDF</button>
+</div>
+</div>
+</div>
+<div class="col-md-6">
+<div id="quotationPreview" class="print-area">
+<img src="Watermark.png" class="watermark">
+<div class="text-center mb-2">
+<img src="logo.png" width="60"><br>
+<strong>JKM PRIME DIGITAL PRINTS</strong><br>
+Quotation for Order
+</div>
+<br>
+<p>Date: <span id="qDatePrint"></span></p>
+<p>To: <span id="qNamePrint"></span></p>
+<p id="quotationText"></p>
+</div>
+</div>
+</div>
 </div>
 
-<!-- Tracker Tab -->
+<!-- Tracker -->
 <div class="tab-pane fade" id="trackerTab">
 <div class="card p-3">
 <h5>Project Tracker</h5>
 <div class="row g-3 mb-3">
-<div class="col-md-6"><label>Project Name</label><input type="text" id="pName" class="form-control" placeholder="Enter project name"></div>
-<div class="col-md-6"><label>Project Income</label><input type="number" id="pIncome" class="form-control" placeholder="Enter expected income"></div>
+<div class="col-md-6">
+<label>Project Name</label>
+<input type="text" id="pName" class="form-control" placeholder="Enter project name">
 </div>
-
+<div class="col-md-6">
+<label>Project Income</label>
+<input type="number" id="pIncome" class="form-control" placeholder="Enter expected income">
+</div>
+</div>
 <div class="table-responsive mb-3">
 <table class="table table-bordered text-center align-middle">
 <thead>
@@ -147,18 +255,23 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
 <tbody id="pTbody"></tbody>
 </table>
 </div>
-
 <div class="row g-3 mb-3">
 <div class="col-md-6">
-<div class="totalWrapper"><div class="totalLabel">TOTAL PROJECT COST</div><div class="totalValue">₱ <span id="pTotalCost">0</span></div></div>
+<div class="totalWrapper">
+<div class="totalLabel">TOTAL PROJECT COST</div>
+<div class="totalValue">₱ <span id="pTotalCost">0</span></div>
+</div>
 </div>
 <div class="col-md-6">
-<div class="totalWrapper"><div class="totalLabel">PROJECT PROFIT</div><div class="profitValue">₱ <span id="pProfit">0</span></div></div>
+<div class="totalWrapper">
+<div class="totalLabel">PROJECT PROFIT</div>
+<div class="profitValue">₱ <span id="pProfit">0</span></div>
 </div>
 </div>
-
-<div class="mt-2"><button class="btn btn-success w-100" onclick="saveProjectTracker()">SAVE PROJECT</button></div>
-
+</div>
+<div class="mt-2">
+<button class="btn btn-success w-100" onclick="saveProjectTracker()">SAVE PROJECT</button>
+</div>
 <div class="card mt-3 p-3">
 <h6>Project History</h6>
 <div class="history-table-wrapper" style="max-height:300px; overflow:auto;">
@@ -179,223 +292,138 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.21.0/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
 <script>
-// ================= Firebase Init =================
+
+// ------------------- FIREBASE -----------------------
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
-  databaseURL: "https://jkm-printing-system-default-rtdb.firebaseio.com",
-  projectId: "your-project-id",
+apiKey: "YOUR_FIREBASE_API_KEY",
+authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
+databaseURL: "https://your-database-url.firebaseio.com",
+projectId: "your-project-id"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ================= Globals =================
-let receiptHistory = [];
+// ------------------- DARK MODE -----------------------
+function toggleDark(){
+document.body.classList.toggle("dark");
+}
+
+// ------------------- RECEIPT -----------------------
 let receiptItems = [];
-let projectMaterials = [];
-let projectHistory = [];
-
-// ================= Receipt Functions =================
-function addItem() {
-  const itemName = document.getElementById('item').value;
-  const qty = Number(document.getElementById('qty').value);
-  const price = Number(document.getElementById('price').value);
-  if(!itemName || qty<=0 || price<=0) return;
-  const amount = qty*price;
-  receiptItems.push({itemName, qty, price, amount});
-  renderReceiptItems();
+function addItem(){
+const desc = document.getElementById("item").value;
+const qty = parseFloat(document.getElementById("qty").value) || 1;
+const price = parseFloat(document.getElementById("price").value) || 0;
+receiptItems.push({desc, qty, price});
+updateReceiptPreview();
 }
-
-function renderReceiptItems(){
-  const tbody = document.querySelector("#previewTable tbody");
-  tbody.innerHTML = '';
-  let total = 0;
-  receiptItems.forEach((i, idx)=>{
-    total += i.amount;
-    const row = tbody.insertRow();
-    row.innerHTML = `<td>${idx+1}</td><td>${i.itemName}</td><td>${i.qty}</td><td>₱${i.price}</td><td>₱${i.amount}</td><td>₱${total}</td>`;
-  });
-  document.getElementById("grandTotal").innerText = `₱${total}`;
-}
-
-function undoItem(){
-  receiptItems.pop();
-  renderReceiptItems();
-}
-
-function saveReceipt(){
-  if(receiptItems.length===0){ Swal.fire("Error","No items added","error"); return; }
-  const total = receiptItems.reduce((a,b)=>a+b.amount,0);
-  const profit = total*0.45;
-  const rno = "JKM"+Math.floor(Math.random()*90000+10000);
-  const receipt = {
-    rno,
-    date: new Date().toLocaleDateString(),
-    shipTo: document.getElementById("custName").value || "-",
-    address: document.getElementById("custAddress").value || "-",
-    total,
-    profit,
-    paymentMethod: document.getElementById("paymentMethod").value,
-    paymentType: document.getElementById("paymentType").value
-  };
-  // Save Firebase
-  db.ref('receipts').push(receipt);
-  Swal.fire("Saved","Receipt saved!","success");
-  receiptItems = [];
-  renderReceiptItems();
-  updateHistory();
-  updateDashboard();
-}
-
-// ================= History Table =================
-function fetchReceiptsFromFirebase(){
-  db.ref('receipts').on('value', snapshot=>{
-    const data = snapshot.val() || {};
-    receiptHistory = Object.values(data);
-    updateHistory();
-    updateDashboard();
-  });
-}
-
-function updateHistory(filterFn){
-  const el = document.getElementById("receiptHistory");
-  el.innerHTML = '';
-  let data = filterFn? receiptHistory.filter(filterFn): receiptHistory;
-  data.forEach((r,i)=>{
-    el.innerHTML += `<tr>
-      <td>${i+1}</td>
-      <td>${r.rno}</td>
-      <td>${r.date}</td>
-      <td>${r.shipTo}</td>
-      <td>₱${Math.round(r.total)}</td>
-      <td>₱${Math.round(r.profit)}</td>
-      <td>${r.paymentType}</td>
-      <td>
-        <button class="btn btn-sm btn-blue" onclick="editReceipt(${i})">🖊️</button>
-        <button class="btn btn-sm btn-red" onclick="deleteReceipt(${i})">✖</button>
-      </td>
-    </tr>`;
-  });
-}
-
-// ================= Dashboard =================
-let lineChart, barChart;
-function updateDashboard(){
-  let daily=0, monthly=0, dailyProfit=0, monthlyProfit=0;
-  const todayStr = new Date().toLocaleDateString();
-  const currentMonth = new Date().getMonth()+1;
-  receiptHistory.forEach(r=>{
-    const rDate = new Date(r.date);
-    if(r.date===todayStr){ daily += r.total; dailyProfit += r.profit; }
-    if(rDate.getMonth()+1===currentMonth){ monthly += r.total; monthlyProfit += r.profit; }
-  });
-  document.getElementById("dailySales").innerText = daily;
-  document.getElementById("dailyProfit").innerText = dailyProfit;
-  document.getElementById("monthlySales").innerText = monthly;
-  document.getElementById("monthlyProfit").innerText = monthlyProfit;
-  renderCharts();
-}
-
-function renderCharts(){
-  const labels = receiptHistory.map(r=>r.date);
-  const data = receiptHistory.map(r=>r.total);
-  const lineCtx = document.getElementById("salesLineChart").getContext("2d");
-  const barCtx = document.getElementById("salesBarChart").getContext("2d");
-  if(lineChart) lineChart.destroy();
-  if(barChart) barChart.destroy();
-  lineChart = new Chart(lineCtx,{ type:'line', data:{ labels, datasets:[{ label:'Sales', data, borderColor:'#22c55e', fill:false }] } });
-  barChart = new Chart(barCtx,{ type:'bar', data:{ labels, datasets:[{ label:'Sales', data, backgroundColor:'#2563eb' }] } });
-}
-
-// ================= Project Tracker =================
-function addProjectMaterial(){
-  const material = document.getElementById("material").value;
-  const packs = Number(document.getElementById("packs").value);
-  const qty = Number(document.getElementById("qty").value);
-  const price = Number(document.getElementById("price").value);
-  if(!material || packs<=0 || qty<=0 || price<=0) return;
-  projectMaterials.push({material,packs,qty,price,totalQty:packs*qty});
-  renderProjectMaterials();
-}
-
-function renderProjectMaterials(){
-  const tbody = document.getElementById("tbody");
-  tbody.innerHTML = '';
-  let total=0;
-  projectMaterials.forEach((m,i)=>{
-    total += m.price;
-    tbody.innerHTML += `<tr>
-      <td>${m.material}</td>
-      <td>${m.packs}</td>
-      <td>${m.qty}</td>
-      <td>${m.totalQty}</td>
-      <td>${m.price}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="delProjectMaterial(${i})">Delete</button></td>
-    </tr>`;
-  });
-  document.getElementById("totalCost").innerText = total;
-  computeProjectProfit();
-}
-
-function delProjectMaterial(i){
-  projectMaterials.splice(i,1);
-  renderProjectMaterials();
-}
-
-function computeProjectProfit(){
-  const income = Number(document.getElementById("income").value);
-  const totalCost = projectMaterials.reduce((sum,m)=>sum+m.price,0);
-  document.getElementById("profit").innerText = income - totalCost;
-}
-
-function saveProject(){
-  if(projectMaterials.length===0){ Swal.fire("Error","Add materials first","error"); return; }
-  const name = document.getElementById("projectName").value || "Unnamed Project";
-  const income = Number(document.getElementById("income").value);
-  const totalCost = projectMaterials.reduce((sum,m)=>sum+m.price,0);
-  const profit = income - totalCost;
-  const date = new Date().toISOString();
-  const projectObj = {date,name,totalCost,income,profit,materials: [...projectMaterials]};
-  db.ref('trackingProjects').push(projectObj);
-  projectHistory.push(projectObj);
-  renderProjectHistory();
-  Swal.fire("Saved",`${name} saved! Profit: ₱${profit}`,"success");
-  projectMaterials=[]; renderProjectMaterials();
-  document.getElementById("projectName").value="";
-  document.getElementById("income").value="";
-}
-
-function renderProjectHistory(){
-  const tbody = document.getElementById("history");
-  tbody.innerHTML = '';
-  projectHistory.forEach((p,i)=>{
-    tbody.innerHTML += `<tr>
-      <td>${new Date(p.date).toLocaleString()}</td>
-      <td>${p.name}</td>
-      <td>₱${p.totalCost}</td>
-      <td>₱${p.income}</td>
-      <td>₱${p.profit}</td>
-      <td>
-        <button class="btn btn-info btn-sm" onclick="viewProject(${i})">View</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteProject(${i})">Delete</button>
-      </td>
-    </tr>`;
-  });
-}
-
-// ================= Load Firebase Data =================
-window.addEventListener('load',()=>{
-  fetchReceiptsFromFirebase();
-  db.ref('trackingProjects').on('value',snap=>{
-    const data = snap.val() || {};
-    projectHistory = Object.values(data);
-    renderProjectHistory();
-  });
+function undoItem(){ receiptItems.pop(); updateReceiptPreview(); }
+function updateReceiptPreview(){
+const tbody = document.querySelector("#previewTable tbody");
+tbody.innerHTML = "";
+let total=0; receiptItems.forEach((item,i)=>{
+const amount = item.qty*item.price; total+=amount;
+tbody.innerHTML+=`<tr><td>${i+1}</td><td>${item.desc}</td><td>${item.qty}</td><td>₱${item.price}</td><td>₱${amount}</td><td>₱${total}</td></tr>`;
 });
+document.getElementById("grandTotal").innerText = `₱${total}`;
+}
+function toggleDownpayment(){
+const type = document.getElementById("paymentType").value;
+document.getElementById("downpaymentAmount").style.display = type==="Downpayment"?"block":"none";
+}
+function saveReceipt(){
+const custName = document.getElementById("custName").value;
+const custAddress = document.getElementById("custAddress").value;
+const payment = document.getElementById("paymentMethod").value;
+const type = document.getElementById("paymentType").value;
+const dpAmt = document.getElementById("downpaymentAmount").value || 0;
+if(!custName || receiptItems.length===0){ alert("Enter customer name and items"); return; }
+const receiptNo = "R"+Date.now();
+const date = new Date().toLocaleString();
+let total = receiptItems.reduce((sum,i)=>sum+i.qty*i.price,0);
+db.ref("receipts/"+receiptNo).set({custName, custAddress, payment, type, dpAmt, date, items:receiptItems, total});
+alert("Receipt saved!"); receiptItems=[]; updateReceiptPreview();
+loadHistory(); updateDashboard();
+}
+
+// ------------------- HISTORY -----------------------
+function loadHistory(){
+const historyTbody = document.getElementById("receiptHistory");
+historyTbody.innerHTML="";
+db.ref("receipts").once("value").then(snapshot=>{
+let i=1; snapshot.forEach(child=>{
+const r = child.val();
+historyTbody.innerHTML+=`<tr>
+<td>${i++}</td>
+<td>${child.key}</td>
+<td>${r.date}</td>
+<td>${r.custName}</td>
+<td>₱${r.total}</td>
+<td>₱${r.total*0.2}</td>
+<td>${r.type}</td>
+<td><button class="btn btn-sm btn-primary" onclick="printReceiptById('${child.key}')">Print</button></td>
+</tr>`;
+}); updateDashboard();
+});
+}
+function printReceiptById(id){
+db.ref("receipts/"+id).once("value").then(snap=>{
+const r = snap.val();
+document.getElementById("rNamePrint").innerText=r.custName;
+document.getElementById("rAddressPrint").innerText=r.custAddress;
+document.getElementById("rDatePrint").innerText=r.date;
+document.getElementById("rNoPrint").innerText=id;
+document.getElementById("rPaymentPrint").innerText=r.payment;
+document.getElementById("rPaymentTypePrint").innerText=r.type;
+receiptItems=r.items;
+updateReceiptPreview();
+window.print();
+});
+}
+
+// ------------------- DASHBOARD -----------------------
+function updateDashboard(){
+let dailySales=0, dailyProfit=0, monthlySales=0, monthlyProfit=0;
+const today = new Date().toLocaleDateString();
+const thisMonth = new Date().getMonth();
+db.ref("receipts").once("value").then(snapshot=>{
+snapshot.forEach(child=>{
+const r = child.val(); const d = new Date(r.date);
+dailySales+=d.toLocaleDateString()===today?r.total:0;
+dailyProfit+=d.toLocaleDateString()===today?r.total*0.2:0;
+monthlySales+=d.getMonth()===thisMonth?r.total:0;
+monthlyProfit+=d.getMonth()===thisMonth?r.total*0.2:0;
+});
+document.getElementById("dailySales").innerText=dailySales;
+document.getElementById("dailyProfit").innerText=dailyProfit;
+document.getElementById("monthlySales").innerText=monthlySales;
+document.getElementById("monthlyProfit").innerText=monthlyProfit;
+updateCharts(snapshot);
+});
+}
+
+// ------------------- CHARTS -----------------------
+let salesLineChart, salesBarChart;
+function updateCharts(snapshot){
+const labels=[], data=[];
+snapshot.forEach(child=>{ labels.push(new Date(child.val().date).toLocaleDateString()); data.push(child.val().total); });
+if(salesLineChart) salesLineChart.destroy();
+salesLineChart = new Chart(document.getElementById("salesLineChart"), {type:'line', data:{labels,data:{label:'Sales',data:data,backgroundColor:'#2563eb'}}, options:{responsive:true}});
+if(salesBarChart) salesBarChart.destroy();
+salesBarChart = new Chart(document.getElementById("salesBarChart"), {type:'bar', data:{labels,data:{label:'Sales',data:data,backgroundColor:'#22c55e'}}, options:{responsive:true}});
+}
+
+// ------------------- EXPORT -----------------------
+function exportToExcel(){ alert("Excel export placeholder"); }
+function exportToPDF(){ alert("PDF export placeholder"); }
+
+// ------------------- INIT -----------------------
+document.addEventListener("DOMContentLoaded",()=>{
+loadHistory();
+updateDashboard();
+});
+
 </script>
 
 </body>
