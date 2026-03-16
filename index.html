@@ -625,19 +625,19 @@ updateHistory(); updateDashboard();
 // ================= Project Tracker ==================
 let projectMaterials=[], projectHistory=[];
 
-const pTbody = document.getElementById("pTbody");
+const pTbody = document.getElementById("projTbody");
 const pTotalCost = document.getElementById("pTotalCost");
 const pProfit = document.getElementById("pProfit");
-const pIncome = document.getElementById("pIncome");
-const pName = document.getElementById("pName");
+const pIncome = document.getElementById("projIncome");
+const pName = document.getElementById("projName");
 const pHistory = document.getElementById("pHistory");
 
 // Add Material
 function addProjectMaterial(){
-  const mat = document.getElementById("pMaterial").value;
-  const packs = Number(document.getElementById("pPacks").value);
-  const qty = Number(document.getElementById("pQty").value);
-  const price = Number(document.getElementById("pPrice").value);
+const mat = document.getElementById("projMaterial").value;
+const packs = Number(document.getElementById("projPacks").value);
+const qty = Number(document.getElementById("projQty").value);
+const price = Number(document.getElementById("projPrice").value);
   if(!mat||packs<=0||qty<=0||price<=0){Swal.fire("Error","Complete all fields","error"); return;}
   projectMaterials.push({name:mat,packs,qty,price});
   renderProjectMaterials();
