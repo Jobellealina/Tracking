@@ -114,7 +114,7 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 <button class="btn btn-success w-100" onclick="saveProject(); return false;">SAVE PROJECT</button>
 </div>
 </div>
-</div>
+</div>z
 
 <!-- SRP TAB -->
 <div id="srpTab" style="display:none">
@@ -255,16 +255,17 @@ function addMaterial(){let m={name:document.getElementById("material").value,pac
 function delMaterial(i){materials.splice(i,1); render();}
 function computeProfit(){let incomeVal=Number(incomeInput.value)||0; profitSpan.innerText=(incomeVal-totalCost).toLocaleString();}
 
-// SAVE PROJECT WITH SWEETALERT
+// SAVE PROJECT
 function saveProject() {
-  if (materials.length === 0) {
-    showToast("Add materials first", "error");
+  if(materials.length === 0){
+    showToast("Add materials first","error");
     return;
   }
 
   let name = projectName.value || "Unnamed Project";
   let incomeVal = Number(incomeInput.value) || 0;
   let date = new Date().toISOString();
+
   let projectObj = {
     date,
     name,
@@ -274,35 +275,28 @@ function saveProject() {
     materials: JSON.parse(JSON.stringify(materials))
   };
 
-  // Save locally first
-  projectHistory.push(projectObj);
-  localStorage.setItem("projects", JSON.stringify(projectHistory));
-  renderHistory();
+  // Push to Firebase
+  let newRef = database.ref('trackingProjects').push();
+  projectObj.key = newRef.key; // store Firebase key
+  newRef.set(projectObj)
+    .then(() => {
+      // Add to local projectHistory
+      projectHistory.push(projectObj);
+      renderHistory();
 
-  // SweetAlert showing only project name
-  Swal.fire({
-    icon: 'success',
-    title: 'Project Saved!',
-    text: name,
-    timer: 2000,
-    showConfirmButton: false
-  });
+      // SweetAlert & Toast
+      Swal.fire({ icon:'success', title:'Project Saved!', text:name, timer:2000, showConfirmButton:false });
+      showToast(`Project "${name}" saved!`, "success");
 
-  // Toast notification
-  showToast(`Project "${name}" saved!`, "success");
-
-  // Save to Firebase asynchronously
-  database.ref('trackingProjects').push(projectObj)
-    .then(() => console.log("Firebase: Project saved"))
-    .catch(err => showToast("Firebase error: " + err.message, "error"));
-
-  // Clear form
-  materials = [];
-  render();
-  projectName.value = "";
-  incomeInput.value = "";
+      // Clear inputs
+      materials = []; render();
+      projectName.value = "";
+      incomeInput.value = "";
+    })
+    .catch(err => showToast("Firebase error: "+err.message,"error"));
 }
-// HISTORY FUNCTIONS
+
+// HISTORY
 function renderHistory(){
   let html="";
   projectHistory.forEach((h,idx)=>{ html+=`<tr>
@@ -318,18 +312,12 @@ function renderHistory(){
 
 function viewProject(idx){
   const modal = new bootstrap.Modal(document.getElementById('materialsModal'));
-  const tbody = document.querySelector('#modalMaterialsTable tbody');
-  tbody.innerHTML="";
-  projectHistory[idx].materials.forEach(m=>{
-    let tr=document.createElement('tr');
-    tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`;
-    tbody.appendChild(tr);
-  });
+  const tbodyModal = document.querySelector('#modalMaterialsTable tbody'); tbodyModal.innerHTML="";
+  projectHistory[idx].materials.forEach(m=>{ let tr=document.createElement('tr'); tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`; tbodyModal.appendChild(tr); });
   modal.show();
 }
-
-function editProject(idx){const p=projectHistory[idx]; projectName.value=p.name; incomeInput.value=p.incomeVal; materials=JSON.parse(JSON.stringify(p.materials)); render();}
-function deleteProject(idx){showConfirm("Are you sure?", r=>{if(r){projectHistory.splice(idx,1); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory(); showToast("Deleted","success");}});}
+function editProject(idx){ const p=projectHistory[idx]; projectName.value=p.name; incomeInput.value=p.incomeVal; materials=JSON.parse(JSON.stringify(p.materials)); render();}
+function deleteProject(idx){ showConfirm("Are you sure?", r=>{ if(r){ let projectKey = projectHistory[idx].key; database.ref('trackingProjects/'+projectKey).remove().then(()=>{ showToast("Deleted","success"); }); projectHistory.splice(idx,1); renderHistory(); }});}
 
 // DARK MODE
 function toggleDark(){document.body.classList.toggle('dark');}
@@ -344,21 +332,19 @@ function addSRP(){ let m={name:document.getElementById("srpMaterial").value, qty
 function renderSRP(){ let html="", tc=0; srpMaterials.forEach((m,i)=>{let total=m.qty*m.price; tc+=total; html+=`<tr><td>${m.name}</td><td>${m.qty}</td><td>₱${m.price}</td><td>₱${total}</td><td><button class="btn btn-danger btn-sm" onclick="delSRP(${i})">Delete</button></td></tr>`; }); srpBody.innerHTML=html; srpTotalSpan.innerText=tc.toLocaleString(); srpSuggestedSpan.innerText=(tc*3).toLocaleString();}
 function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
 
-// LOAD PROJECTS
+// LOAD PROJECTS (Real-time sync)
 function loadProjects() {
-  projectHistory = []; // start empty
-
-  // Listen to Firebase in real-time
-  database.ref('trackingProjects').on('child_added', snap => {
-    const project = snap.val();
-
-    // Check if it's already in projectHistory (avoid duplicates)
-    if (!projectHistory.some(p => p.date === project.date && p.name === project.name)) {
-      projectHistory.push(project);
-      renderHistory();
-    }
-  });
+  database.ref('trackingProjects').once('value')
+    .then(snap => {
+      const data = snap.val();
+      if(data){
+        projectHistory = Object.values(data); // includes key
+        renderHistory();
+      }
+    })
+    .catch(console.log);
 }
+
 loadProjects(); render(); renderSRP();
 </script>
 </body>
