@@ -34,7 +34,6 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 <body>
 
 <div class="container py-3">
-
 <div class="headerBox">
 <img src="logo.png" class="logo" onerror="this.style.display='none'">
 <div>
@@ -211,38 +210,26 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
   </div>
 </div>
 
-<!-- Firebase -->
-<!-- Firebase (Compat version, like POS) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<!-- SweetAlert2 JS -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.all.min.js"></script>
+<!-- Firebase (Modular SDK) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
+import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-database.js";
 
-<script>
+// Firebase Config
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
-  databaseURL: "https://tracking-9b54a-default-rtdb.firebaseio.com/",
-  projectId: "your-project-id",
+  apiKey: "YOUR_API_KEY",
+  authDomain: "jkm-project-tracking.firebaseapp.com",
+  databaseURL: "https://tracking-9b54a-default-rtdb.firebaseio.com",
+  projectId: "jkm-project-tracking",
+  storageBucket: "jkm-project-tracking.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
 
-function fetchHistoryFromFirebase(){
-  const ref = db.ref('trackingProjects'); // o kung anong path sa Firebase
-  ref.on('value', snapshot => {
-    const data = snapshot.val() || {};
-    projectHistory = Object.values(data); // convert object to array
-    renderHistory(); // function mo para ipakita sa table
-  });
-}
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const database = getDatabase(app);
 
-// Call this after Firebase initialization
-fetchHistoryFromFirebase();
-</script>
-
-<script>
 let materials=[], totalCost=0, projectHistory=[], srpMaterials=[];
 let confirmCallback=null;
 
@@ -265,79 +252,30 @@ function addMaterial(){let m={name:document.getElementById("material").value,pac
 function delMaterial(i){materials.splice(i,1); render();}
 function computeProfit(){let incomeVal=Number(incomeInput.value)||0; profitSpan.innerText=(incomeVal-totalCost).toLocaleString();}
 
-// SAVE PROJECT WITH SWEETALERT
+// SAVE PROJECT
 function saveProject() {
-  if (materials.length === 0) {
-    showToast("Add materials first", "error");
-    return;
-  }
-
+  if (materials.length === 0) { showToast("Add materials first", "error"); return; }
   let name = projectName.value || "Unnamed Project";
   let incomeVal = Number(incomeInput.value) || 0;
   let date = new Date().toISOString();
-  let projectObj = {
-    date,
-    name,
-    totalCost,
-    incomeVal,
-    profit: incomeVal - totalCost,
-    materials: JSON.parse(JSON.stringify(materials))
-  };
+  let projectObj = { date,name,totalCost,incomeVal,profit:incomeVal-totalCost,materials:JSON.parse(JSON.stringify(materials)) };
 
-  // Save locally first
   projectHistory.push(projectObj);
   localStorage.setItem("projects", JSON.stringify(projectHistory));
   renderHistory();
-
-  // SweetAlert showing only project name
-  Swal.fire({
-    icon: 'success',
-    title: 'Project Saved!',
-    text: name,
-    timer: 2000,
-    showConfirmButton: false
-  });
-
-  // Toast notification
   showToast(`Project "${name}" saved!`, "success");
 
-  // Save to Firebase asynchronously
-  database.ref('trackingProjects').push(projectObj)
-    .then(() => console.log("Firebase: Project saved"))
-    .catch(err => showToast("Firebase error: " + err.message, "error"));
+  // Firebase push
+  push(ref(database,'trackingProjects'),projectObj)
+    .then(()=>console.log("Firebase: Project saved"))
+    .catch(err=>showToast("Firebase error: "+err.message,"error"));
 
-  // Clear form
-  materials = [];
-  render();
-  projectName.value = "";
-  incomeInput.value = "";
-}
-// HISTORY FUNCTIONS
-function renderHistory(){
-  let html="";
-  projectHistory.forEach((h,idx)=>{ html+=`<tr>
-<td>${new Date(h.date).toLocaleString()}</td><td>${h.name}</td><td>₱${h.totalCost.toLocaleString()}</td>
-<td>₱${h.incomeVal.toLocaleString()}</td><td>₱${h.profit.toLocaleString()}</td>
-<td>
-<button class="btn btn-info btn-sm" onclick="viewProject(${idx})">View</button>
-<button class="btn btn-warning btn-sm" onclick="editProject(${idx})">Edit</button>
-<button class="btn btn-danger btn-sm" onclick="deleteProject(${idx})">Delete</button>
-</td></tr>`});
-  history.innerHTML=html;
+  materials=[]; render(); projectName.value=""; incomeInput.value="";
 }
 
-function viewProject(idx){
-  const modal = new bootstrap.Modal(document.getElementById('materialsModal'));
-  const tbody = document.querySelector('#modalMaterialsTable tbody');
-  tbody.innerHTML="";
-  projectHistory[idx].materials.forEach(m=>{
-    let tr=document.createElement('tr');
-    tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`;
-    tbody.appendChild(tr);
-  });
-  modal.show();
-}
-
+// HISTORY
+function renderHistory(){let html=""; projectHistory.forEach((h,idx)=>{ html+=`<tr><td>${new Date(h.date).toLocaleString()}</td><td>${h.name}</td><td>₱${h.totalCost.toLocaleString()}</td><td>₱${h.incomeVal.toLocaleString()}</td><td>₱${h.profit.toLocaleString()}</td><td><button class="btn btn-info btn-sm" onclick="viewProject(${idx})">View</button><button class="btn btn-warning btn-sm" onclick="editProject(${idx})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteProject(${idx})">Delete</button></td></tr>`; }); history.innerHTML=html;}
+function viewProject(idx){const modal = new bootstrap.Modal(document.getElementById('materialsModal')); const tbody = document.querySelector('#modalMaterialsTable tbody'); tbody.innerHTML=""; projectHistory[idx].materials.forEach(m=>{let tr=document.createElement('tr'); tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`; tbody.appendChild(tr); }); modal.show();}
 function editProject(idx){const p=projectHistory[idx]; projectName.value=p.name; incomeInput.value=p.incomeVal; materials=JSON.parse(JSON.stringify(p.materials)); render();}
 function deleteProject(idx){showConfirm("Are you sure?", r=>{if(r){projectHistory.splice(idx,1); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory(); showToast("Deleted","success");}});}
 
@@ -354,34 +292,21 @@ function addSRP(){ let m={name:document.getElementById("srpMaterial").value, qty
 function renderSRP(){ let html="", tc=0; srpMaterials.forEach((m,i)=>{let total=m.qty*m.price; tc+=total; html+=`<tr><td>${m.name}</td><td>${m.qty}</td><td>₱${m.price}</td><td>₱${total}</td><td><button class="btn btn-danger btn-sm" onclick="delSRP(${i})">Delete</button></td></tr>`; }); srpBody.innerHTML=html; srpTotalSpan.innerText=tc.toLocaleString(); srpSuggestedSpan.innerText=(tc*3).toLocaleString();}
 function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
 
-// LOAD PROJECTS
+// LOAD PROJECTS FROM FIREBASE
 function loadProjects() {
-  projectHistory = []; // reset local array
-
-  // Load all existing projects
-  database.ref('trackingProjects').once('value')
-    .then(snapshot => {
-      const data = snapshot.val();
-      if (data) {
-        // Convert Firebase object to array and sort by date
-        projectHistory = Object.values(data).sort((a,b) => new Date(a.date) - new Date(b.date));
-        renderHistory();
-      }
-
-      // Now listen for new projects in real-time
-      database.ref('trackingProjects').on('child_added', snap => {
-        const project = snap.val();
-
-        // Only add if not already in projectHistory
-        if (!projectHistory.some(p => p.date === project.date && p.name === project.name)) {
-          projectHistory.push(project);
-          renderHistory();
-        }
-      });
-    })
-    .catch(err => showToast("Firebase load error: " + err.message, "error"));
+  projectHistory=[];
+  const projectsRef = ref(database,'trackingProjects');
+  onChildAdded(projectsRef, snap=>{
+    const project = snap.val();
+    if(!projectHistory.some(p=>p.date===project.date && p.name===project.name)){
+      projectHistory.push(project);
+      renderHistory();
+    }
+  });
 }
 loadProjects(); render(); renderSRP();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.all.min.js"></script>
 </body>
 </html>
