@@ -33,6 +33,7 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 <body>
 
 <div class="container py-3">
+
 <div class="headerBox">
 <img src="logo.png" class="logo" onerror="this.style.display='none'">
 <div>
@@ -206,26 +207,28 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
   </div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-database.js";
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-database.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.all.min.js"></script>
 
+<script>
+// Firebase config
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "jkm-project-tracking.firebaseapp.com",
-  databaseURL: "https://tracking-9b54a-default-rtdb.firebaseio.com",
+  databaseURL: "https://tracking-9b54a-default-rtdb.firebaseio.com/",
   projectId: "jkm-project-tracking",
   storageBucket: "jkm-project-tracking.appspot.com",
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-let materials=[], totalCost=0, projectHistory=[], srpMaterials=[];
-let confirmCallback=null;
-
+// VARIABLES
+let materials=[], totalCost=0, projectHistory=[], srpMaterials=[], confirmCallback=null;
 const tbody=document.getElementById("tbody");
 const totalCostSpan=document.getElementById("totalCost");
 const profitSpan=document.getElementById("profit");
@@ -236,7 +239,10 @@ const srpBody=document.getElementById("srpBody");
 const srpTotalSpan=document.getElementById("srpTotal");
 const srpSuggestedSpan=document.getElementById("srpSuggested");
 
+// Toast
 function showToast(msg,type='info'){const t=document.getElementById('toast'); t.innerText=msg; t.style.background=type==='error'?'#dc3545':type==='success'?'#198754':'#0d6efd'; t.style.display='block'; setTimeout(()=>{t.style.display='none'},3000);}
+
+// Tabs
 function showTab(e,tab){e.preventDefault(); document.getElementById('materialsTab').style.display=tab==='materials'?'block':'none'; document.getElementById('srpTab').style.display=tab==='srp'?'block':'none'; document.querySelectorAll('#tabMenu .nav-link').forEach(n=>n.classList.remove('active')); e.currentTarget.classList.add('active');}
 
 // MATERIALS
@@ -247,43 +253,74 @@ function computeProfit(){let incomeVal=Number(incomeInput.value)||0; profitSpan.
 
 // SAVE PROJECT
 function saveProject() {
-  if(materials.length===0){showToast("Add materials first","error"); return;}
-  let name=projectName.value||"Unnamed Project";
-  let incomeVal=Number(incomeInput.value)||0;
+  if (materials.length === 0) {showToast("Add materials first","error"); return;}
+  let name=projectName.value||"Unnamed Project"; let incomeVal=Number(incomeInput.value)||0;
   let date=new Date().toISOString();
-  let project={date,name,totalCost,incomeVal,profit:incomeVal-totalCost,materials:JSON.parse(JSON.stringify(materials))};
+  let projectObj={date,name,totalCost,incomeVal,profit:incomeVal-totalCost,materials:JSON.parse(JSON.stringify(materials))};
 
-  // Firebase push
-  push(ref(db,'trackingProjects'),project)
-  .then(()=>showToast(`Project "${name}" saved!`,"success"))
-  .catch(err=>showToast("Firebase error: "+err.message,"error"));
+  // Save locally
+  projectHistory.push(projectObj);
+  localStorage.setItem("projects",JSON.stringify(projectHistory));
+  renderHistory();
+
+  Swal.fire({icon:'success',title:'Project Saved!',text:name,timer:2000,showConfirmButton:false});
+  showToast(`Project "${name}" saved!`,"success");
+
+  // Save to Firebase
+  database.ref('trackingProjects').push(projectObj)
+    .then(()=>console.log("Firebase: Project saved"))
+    .catch(err=>showToast("Firebase error: "+err.message,"error"));
 
   materials=[]; render(); projectName.value=""; incomeInput.value="";
 }
 
 // HISTORY
-function renderHistory(){let html=""; projectHistory.forEach((h,idx)=>{ html+=`<tr><td>${new Date(h.date).toLocaleString()}</td><td>${h.name}</td><td>₱${h.totalCost.toLocaleString()}</td><td>₱${h.incomeVal.toLocaleString()}</td><td>₱${h.profit.toLocaleString()}</td><td><button class="btn btn-info btn-sm" onclick="viewProject(${idx})">View</button></td></tr>`; }); history.innerHTML=html;}
+function renderHistory(){let html=""; projectHistory.forEach((h,idx)=>{ html+=`<tr><td>${new Date(h.date).toLocaleString()}</td><td>${h.name}</td><td>₱${h.totalCost.toLocaleString()}</td><td>₱${h.incomeVal.toLocaleString()}</td><td>₱${h.profit.toLocaleString()}</td><td><button class="btn btn-info btn-sm" onclick="viewProject(${idx})">View</button><button class="btn btn-warning btn-sm" onclick="editProject(${idx})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteProject(${idx})">Delete</button></td></tr>`}); history.innerHTML=html;}
 function viewProject(idx){const modal=new bootstrap.Modal(document.getElementById('materialsModal')); const tbody=document.querySelector('#modalMaterialsTable tbody'); tbody.innerHTML=""; projectHistory[idx].materials.forEach(m=>{let tr=document.createElement('tr'); tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`; tbody.appendChild(tr);}); modal.show();}
+function editProject(idx){const p=projectHistory[idx]; projectName.value=p.name; incomeInput.value=p.incomeVal; materials=JSON.parse(JSON.stringify(p.materials)); render();}
+function deleteProject(idx){showConfirm("Are you sure?",r=>{if(r){projectHistory.splice(idx,1); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory(); showToast("Deleted","success");}});}
 
 // DARK MODE
 function toggleDark(){document.body.classList.toggle('dark');}
 
-// LOAD PROJECTS REAL-TIME
-onChildAdded(ref(db,'trackingProjects'),snap=>{
-  const project=snap.val();
-  if(!projectHistory.some(p=>p.date===project.date&&p.name===project.name)){
-    projectHistory.push(project);
-    renderHistory();
-  }
-});
+// CONFIRM
+function showConfirm(msg,cb){document.getElementById('confirmMessage').innerText=msg; document.getElementById('confirmModal').style.display='flex'; confirmCallback=cb;}
+function confirmYes(){document.getElementById('confirmModal').style.display='none'; if(confirmCallback) confirmCallback(true);}
+function confirmNo(){document.getElementById('confirmModal').style.display='none'; if(confirmCallback) confirmCallback(false);}
 
 // SRP
-function addSRP(){ let m={name:document.getElementById("srpMaterial").value, qty:Number(document.getElementById("srpQty").value), price:Number(document.getElementById("srpPrice").value)}; if(!m.name||!m.qty||!m.price){showToast("Complete SRP","error"); return;} srpMaterials.push(m); renderSRP(); document.getElementById("srpMaterial").value=""; document.getElementById("srpQty").value=""; document.getElementById("srpPrice").value="";}
-function renderSRP(){ let html="", tc=0; srpMaterials.forEach((m,i)=>{let total=m.qty*m.price; tc+=total; html+=`<tr><td>${m.name}</td><td>${m.qty}</td><td>₱${m.price}</td><td>₱${total}</td><td><button class="btn btn-danger btn-sm" onclick="delSRP(${i})">Delete</button></td></tr>`; }); srpBody.innerHTML=html; srpTotalSpan.innerText=tc.toLocaleString(); srpSuggestedSpan.innerText=(tc*3).toLocaleString();}
+function addSRP(){let m={name:document.getElementById("srpMaterial").value,qty:Number(document.getElementById("srpQty").value),price:Number(document.getElementById("srpPrice").value)}; if(!m.name||!m.qty||!m.price){showToast("Complete SRP","error"); return;} srpMaterials.push(m); renderSRP(); document.getElementById("srpMaterial").value=""; document.getElementById("srpQty").value=""; document.getElementById("srpPrice").value="";}
+function renderSRP(){let html="",tc=0; srpMaterials.forEach((m,i)=>{let total=m.qty*m.price; tc+=total; html+=`<tr><td>${m.name}</td><td>${m.qty}</td><td>₱${m.price}</td><td>₱${total}</td><td><button class="btn btn-danger btn-sm" onclick="delSRP(${i})">Delete</button></td></tr>`;}); srpBody.innerHTML=html; srpTotalSpan.innerText=tc.toLocaleString(); srpSuggestedSpan.innerText=(tc*3).toLocaleString();}
 function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
-</script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.all.min.js"></script>
+// LOAD PROJECTS
+function loadProjects(){
+  // Load from localStorage
+  let stored=localStorage.getItem("projects"); if(stored){projectHistory=JSON.parse(stored); renderHistory();}
+
+  // Listen to Firebase in real-time
+  database.ref('trackingProjects').on('child_added',snap=>{
+    const project=snap.val();
+    if(!projectHistory.some(p=>p.date===project.date && p.name===project.name)){
+      projectHistory.push(project); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory();
+    }
+  });
+}
+loadProjects(); render(); renderSRP();
+
+// EXPOSE FUNCTIONS TO WINDOW FOR INLINE BUTTONS
+window.addMaterial=addMaterial;
+window.delMaterial=delMaterial;
+window.computeProfit=computeProfit;
+window.saveProject=saveProject;
+window.viewProject=viewProject;
+window.editProject=editProject;
+window.deleteProject=deleteProject;
+window.addSRP=addSRP;
+window.delSRP=delSRP;
+window.renderSRP=renderSRP;
+window.showTab=showTab;
+window.toggleDark=toggleDark;
+</script>
 </body>
 </html>
