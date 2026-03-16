@@ -346,13 +346,14 @@ function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
 
 // LOAD PROJECTS
 function loadProjects(){
-  projectHistory = JSON.parse(localStorage.getItem("projects")||"[]");
-  renderHistory();
+  // 1. Load projects from Firebase
   database.ref('trackingProjects').once('value').then(snap=>{
     const data = snap.val();
-    if(data){ Object.values(data).forEach(p=>{
-      if(!projectHistory.some(lp=>lp.date===p.date && lp.name===p.name)) projectHistory.push(p);
-    }); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory();}
+    if(data){
+      projectHistory = Object.values(data); // replace localStorage with Firebase data
+      localStorage.setItem("projects", JSON.stringify(projectHistory)); // optional cache
+      renderHistory();
+    }
   }).catch(console.log);
 }
 
