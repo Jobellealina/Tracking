@@ -212,24 +212,34 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 </div>
 
 <!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-database.js"></script>
+<!-- Firebase (Compat version, like POS) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <!-- SweetAlert2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.all.min.js"></script>
 
 <script>
 const firebaseConfig = {
-  apiKey: "YOUR_NEW_API_KEY",
-  authDomain: "tracking-9b54a.firebaseapp.com",
-  databaseURL: "https://tracking-9b54a-default-rtdb.firebaseio.com",
-  projectId: "tracking-9b54a",
-  storageBucket: "tracking-9b54a.appspot.com",
-  messagingSenderId: "YOUR_NEW_SENDER_ID",
-  appId: "YOUR_NEW_APP_ID"
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
+  databaseURL: "https://tracking-9b54a-default-rtdb.firebaseio.com/",
+  projectId: "your-project-id",
 };
 firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+const db = firebase.database();
+
+function fetchHistoryFromFirebase(){
+  const ref = db.ref('trackingProjects'); // o kung anong path sa Firebase
+  ref.on('value', snapshot => {
+    const data = snapshot.val() || {};
+    projectHistory = Object.values(data); // convert object to array
+    renderHistory(); // function mo para ipakita sa table
+  });
+}
+
+// Call this after Firebase initialization
+fetchHistoryFromFirebase();
 </script>
 
 <script>
