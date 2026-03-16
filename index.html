@@ -66,47 +66,47 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
   <img src="logo1.png" class="mb-3 mx-auto" style="border-radius:10px; height:50px; width:50px;">
   <h5 class="text-center mb-3">JKM Prime Digital Prints</h5><br>
   <nav class="nav flex-column" role="tablist">
-    <a class="nav-link active" data-bs-toggle="tab" href="#dashboardTab"><i class="bi bi-speedometer2 fs-5"></i><span class="d-none d-md-inline">Dashboard</span></a><br>
-    <a class="nav-link" data-bs-toggle="tab" href="#receiptTab"><i class="bi bi-receipt fs-5"></i><span class="d-none d-md-inline">Add Receipt</span></a><br>
-    <a class="nav-link" data-bs-toggle="tab" href="#historyTab"><i class="bi bi-clock-history fs-5"></i><span class="d-none d-md-inline">History</span></a><br>
-    <a class="nav-link" data-bs-toggle="tab" href="#quotationTab"><i class="bi bi-file-earmark-text fs-5"></i><span class="d-none d-md-inline">Quotation</span></a><br>
-    <a class="nav-link" data-bs-toggle="tab" href="#trackerTab"><i class="bi bi-kanban fs-5"></i><span class="d-none d-md-inline">Tracker</span></a>
+    <a class="nav-link active" data-bs-toggle="tab" href="#dashboardTab"><i class="bi bi-speedometer2 fs-5"></i> Dashboard</a><br>
+    <a class="nav-link" data-bs-toggle="tab" href="#receiptTab"><i class="bi bi-receipt fs-5"></i> Add Receipt</a><br>
+    <a class="nav-link" data-bs-toggle="tab" href="#historyTab"><i class="bi bi-clock-history fs-5"></i> History</a><br>
+    <a class="nav-link" data-bs-toggle="tab" href="#quotationTab"><i class="bi bi-file-earmark-text fs-5"></i> Quotation</a><br>
+    <a class="nav-link" data-bs-toggle="tab" href="#trackerTab"><i class="bi bi-kanban fs-5"></i> Tracker</a>
   </nav><br>
-  <button class="btn btn-primary toggle-btn mx-auto mt-3" onclick="toggleDark()"><i class="bi bi-moon-stars-fill fs-5"></i></button>
+  <button class="btn btn-primary toggle-btn mx-auto mt-3" onclick="toggleDark()">Toggle Dark</button>
 </div>
 
 <div class="main-content">
   <div class="tab-content">
 
-    <!-- Dashboard Tab -->
+    <!-- Dashboard -->
     <div class="tab-pane fade show active" id="dashboardTab">
-      <div class="dashboard-columns mb-3 d-flex flex-wrap gap-2">
-        <div class="card p-3 bg-secondary text-white" style="width: 300px;"> 
+      <div class="d-flex gap-2 flex-wrap mb-3">
+        <div class="card p-3 bg-secondary text-white" style="width:300px;">
           <h6>Daily Sales</h6><h5>₱ <span id="dailySales">0</span></h5>
         </div>
-        <div class="card p-3 bg-success text-white" style="width: 300px;" >
+        <div class="card p-3 bg-success text-white" style="width:300px;">
           <h6>Daily Profit</h6><h5>₱ <span id="dailyProfit">0</span></h5>
         </div>
-        <div class="card p-3 bg-primary text-white" style="width: 300px;">
+        <div class="card p-3 bg-primary text-white" style="width:300px;">
           <h6>Monthly Sales</h6><h5>₱ <span id="monthlySales">0</span></h5>
         </div>
-        <div class="card p-3 bg-danger text-white" style="width: 300px;">
+        <div class="card p-3 bg-danger text-white" style="width:300px;">
           <h6>Monthly Profit</h6><h5>₱ <span id="monthlyProfit">0</span></h5>
         </div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <div class="card p-3" style="flex:1; height: 400px;">
+        <div class="card p-3" style="flex:1; height:400px;">
           <h6>Sales Line Chart</h6>
           <canvas id="salesLineChart" style="height:350px;"></canvas>
         </div>
-        <div class="card p-3" style="flex:1; height: 400px;">
+        <div class="card p-3" style="flex:1; height:400px;">
           <h6>Sales Bar Chart</h6>
-          <canvas id="salesBarChart" style="height: 350px;"></canvas>
+          <canvas id="salesBarChart" style="height:350px;"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- Receipt Tab -->
+    <!-- Receipt -->
     <div class="tab-pane fade" id="receiptTab">
       <div class="row">
         <div class="col-md-6">
@@ -114,8 +114,8 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
             <h5>Add Service</h5>
             <div class="row g-2 mb-2">
               <div class="col-md-5"><select id="item" class="form-select"></select></div>
-              <div class="col-md-2"><input type="number" id="qty" value="1" class="form-control"></div>
-              <div class="col-md-3"><input type="number" id="price" class="form-control"></div>
+              <div class="col-md-2"><input type="number" id="receiptQty" value="1" class="form-control"></div>
+              <div class="col-md-3"><input type="number" id="receiptPrice" class="form-control"></div>
               <div class="col-md-2"><button class="btn btn-blue btn-professional" onclick="addItem()">Add</button></div>
             </div>
             <input type="text" placeholder="Customer Name" id="custName" class="form-control mb-1">
@@ -129,13 +129,12 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
             </select>
             <input type="number" id="downpaymentAmount" placeholder="Downpayment Amount" class="form-control mb-1" style="display:none;">
             <div class="mt-2 d-flex gap-1 flex-wrap">
-              <button class="btn btn-green btn-professional" onclick="saveReceipt()">Save</button>
-              <button class="btn btn-green btn-professional" onclick="printReceipt()">Print</button>
-              <button class="btn btn-red btn-professional" onclick="undoItem()">Undo</button>
+              <button class="btn btn-green" onclick="saveReceipt()">Save</button>
+              <button class="btn btn-green" onclick="printReceipt()">Print</button>
+              <button class="btn btn-red" onclick="undoItem()">Undo</button>
             </div>
           </div>
         </div>
-
         <div class="col-md-6">
           <div id="receiptPreview" class="print-area">
             <img src="Watermark.png" class="watermark">
@@ -152,7 +151,7 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
             <div style="overflow-x:auto;">
               <table class="table table-sm" id="previewTable">
                 <thead>
-                  <tr style="border-bottom: 1px solid #b5c6eb; border-top: 1px solid #b5c6eb;">
+                  <tr>
                     <th>No</th><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th><th>Total</th>
                   </tr>
                 </thead>
@@ -171,15 +170,15 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
       </div>
     </div>
 
-    <!-- History Tab -->
+    <!-- History -->
     <div class="tab-pane fade" id="historyTab">
       <div class="card p-3">
-        <h5 style="color:#7995f2;">Receipt History</h5>
+        <h5>Receipt History</h5>
         <div class="row mb-2">
           <div class="col-md-3"><input type="date" id="fromDate" class="form-control"></div>
           <div class="col-md-3"><input type="date" id="toDate" class="form-control"></div>
-          <div class="col-md-3"><input type="text" id="searchInput" class="form-control" placeholder="Search Name or Receipt No."></div>
-          <div class="col-md-3"><button class="btn btn-blue btn-professional" onclick="applyFilters()">Filter</button></div>
+          <div class="col-md-3"><input type="text" id="searchInput" class="form-control" placeholder="Search"></div>
+          <div class="col-md-3"><button class="btn btn-blue" onclick="applyFilters()">Filter</button></div>
         </div>
         <div class="history-table-wrapper">
           <table class="table table-sm" id="historyTable">
@@ -192,24 +191,24 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
           </table>
         </div>
         <div class="mb-2">
-          <button class="btn btn-blue btn-professional" onclick="exportToExcel()">Excel</button>
-          <button class="btn btn-danger btn-professional" onclick="exportToPDF()">PDF</button>
+          <button class="btn btn-blue" onclick="exportToExcel()">Excel</button>
+          <button class="btn btn-red" onclick="exportToPDF()">PDF</button>
         </div>
       </div>
     </div>
 
-    <!-- Quotation Tab -->
+    <!-- Quotation -->
     <div class="tab-pane fade" id="quotationTab">
-      <!-- Quotation content (same as previous fix) -->
+      <!-- Paste your full Quotation HTML here, keep IDs as qCustName, qItemSelect, qQty, qUnitPrice, qDatePrint, qNamePrint, quotationText -->
     </div>
 
-    <!-- Tracker Tab -->
+    <!-- Tracker -->
     <div class="tab-pane fade" id="trackerTab">
-      <!-- Tracker content (same as previous fix) -->
+      <!-- Paste full Tracker HTML here, use unique IDs like projMaterial, projPacks, projQty, projPrice, totalCost, profit, history -->
     </div>
 
   </div> <!-- End tab-content -->
-</div> <!-- End main-content -->
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.21.0/package/dist/xlsx.full.min.js"></script>
