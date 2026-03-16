@@ -183,219 +183,218 @@ body.dark .table-sm th, body.dark .table-sm td { color:white; background:transpa
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
 <script>
-// ====================== Firebase Init ======================
+// ================= Firebase Init =================
 const firebaseConfig = {
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
-    databaseURL: "https://jkm-printing-system-default-rtdb.firebaseio.com/",
-    projectId: "your-project-id",
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
+  databaseURL: "https://jkm-printing-system-default-rtdb.firebaseio.com",
+  projectId: "your-project-id",
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ====================== Globals ======================
+// ================= Globals =================
+let receiptHistory = [];
 let receiptItems = [];
 let projectMaterials = [];
+let projectHistory = [];
 
-// ====================== Dark Mode Toggle ======================
-function toggleDark() {
-    document.body.classList.toggle('dark');
-}
-
-// ====================== Receipt Functions ======================
+// ================= Receipt Functions =================
 function addItem() {
-    const name = document.getElementById('itemName').value.trim();
-    const qty = Number(document.getElementById('itemQty').value);
-    const price = Number(document.getElementById('itemPrice').value);
-    if(!name || qty <=0 || price <=0) return alert('Invalid input');
-    const total = qty*price;
-    receiptItems.push({ name, qty, price, total });
-    renderReceiptItems();
+  const itemName = document.getElementById('item').value;
+  const qty = Number(document.getElementById('qty').value);
+  const price = Number(document.getElementById('price').value);
+  if(!itemName || qty<=0 || price<=0) return;
+  const amount = qty*price;
+  receiptItems.push({itemName, qty, price, amount});
+  renderReceiptItems();
 }
 
-function renderReceiptItems() {
-    const tbody = document.getElementById('receiptTbody');
-    tbody.innerHTML = '';
-    let subtotal = 0;
-    receiptItems.forEach((item, index) => {
-        subtotal += item.total;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${item.name}</td>
-                        <td>${item.qty}</td>
-                        <td>${item.price}</td>
-                        <td>${item.total}</td>
-                        <td><button class="btn btn-danger btn-sm" onclick="undoItem(${index})">Undo</button></td>`;
-        tbody.appendChild(tr);
-    });
-    document.getElementById('receiptSubtotal').innerText = subtotal;
+function renderReceiptItems(){
+  const tbody = document.querySelector("#previewTable tbody");
+  tbody.innerHTML = '';
+  let total = 0;
+  receiptItems.forEach((i, idx)=>{
+    total += i.amount;
+    const row = tbody.insertRow();
+    row.innerHTML = `<td>${idx+1}</td><td>${i.itemName}</td><td>${i.qty}</td><td>₱${i.price}</td><td>₱${i.amount}</td><td>₱${total}</td>`;
+  });
+  document.getElementById("grandTotal").innerText = `₱${total}`;
 }
 
-function undoItem(index){
-    receiptItems.splice(index,1);
-    renderReceiptItems();
+function undoItem(){
+  receiptItems.pop();
+  renderReceiptItems();
 }
 
 function saveReceipt(){
-    const date = new Date().toLocaleDateString();
-    const total = receiptItems.reduce((acc,i)=>acc+i.total,0);
-    const newRef = db.ref('receipts').push();
-    newRef.set({ date, items: receiptItems, total });
-    Swal.fire('Saved','Receipt saved successfully','success');
-    receiptItems = [];
-    renderReceiptItems();
+  if(receiptItems.length===0){ Swal.fire("Error","No items added","error"); return; }
+  const total = receiptItems.reduce((a,b)=>a+b.amount,0);
+  const profit = total*0.45;
+  const rno = "JKM"+Math.floor(Math.random()*90000+10000);
+  const receipt = {
+    rno,
+    date: new Date().toLocaleDateString(),
+    shipTo: document.getElementById("custName").value || "-",
+    address: document.getElementById("custAddress").value || "-",
+    total,
+    profit,
+    paymentMethod: document.getElementById("paymentMethod").value,
+    paymentType: document.getElementById("paymentType").value
+  };
+  // Save Firebase
+  db.ref('receipts').push(receipt);
+  Swal.fire("Saved","Receipt saved!","success");
+  receiptItems = [];
+  renderReceiptItems();
+  updateHistory();
+  updateDashboard();
 }
 
-// ====================== Dashboard Functions ======================
-function updateDashboard(){
-    db.ref('receipts').once('value',snap=>{
-        const data = snap.val() || {};
-        let dailySales=0, monthlySales=0;
-        const today = new Date().toLocaleDateString();
-        const month = new Date().getMonth();
-        Object.values(data).forEach(r=>{
-            const rDate = new Date(r.date);
-            if(r.date === today) dailySales += r.total;
-            if(rDate.getMonth() === month) monthlySales += r.total;
-        });
-        document.getElementById('dailySales').innerText = dailySales;
-        document.getElementById('monthlySales').innerText = monthlySales;
-        // assuming profit = 20% of sales
-        document.getElementById('dailyProfit').innerText = (dailySales*0.2).toFixed(2);
-        document.getElementById('monthlyProfit').innerText = (monthlySales*0.2).toFixed(2);
-        renderCharts(data);
-    });
+// ================= History Table =================
+function fetchReceiptsFromFirebase(){
+  db.ref('receipts').on('value', snapshot=>{
+    const data = snapshot.val() || {};
+    receiptHistory = Object.values(data);
+    updateHistory();
+    updateDashboard();
+  });
 }
 
-// ====================== Chart Functions ======================
+function updateHistory(filterFn){
+  const el = document.getElementById("receiptHistory");
+  el.innerHTML = '';
+  let data = filterFn? receiptHistory.filter(filterFn): receiptHistory;
+  data.forEach((r,i)=>{
+    el.innerHTML += `<tr>
+      <td>${i+1}</td>
+      <td>${r.rno}</td>
+      <td>${r.date}</td>
+      <td>${r.shipTo}</td>
+      <td>₱${Math.round(r.total)}</td>
+      <td>₱${Math.round(r.profit)}</td>
+      <td>${r.paymentType}</td>
+      <td>
+        <button class="btn btn-sm btn-blue" onclick="editReceipt(${i})">🖊️</button>
+        <button class="btn btn-sm btn-red" onclick="deleteReceipt(${i})">✖</button>
+      </td>
+    </tr>`;
+  });
+}
+
+// ================= Dashboard =================
 let lineChart, barChart;
-function renderCharts(receipts){
-    const labels = [];
-    const data = [];
-    Object.values(receipts).forEach(r=>{
-        labels.push(r.date);
-        data.push(r.total);
-    });
-    const ctxLine = document.getElementById('salesLineChart').getContext('2d');
-    if(lineChart) lineChart.destroy();
-    lineChart = new Chart(ctxLine,{
-        type:'line',
-        data:{ labels, datasets:[{ label:'Sales', data, borderColor:'blue', fill:false }] }
-    });
-    const ctxBar = document.getElementById('salesBarChart').getContext('2d');
-    if(barChart) barChart.destroy();
-    barChart = new Chart(ctxBar,{
-        type:'bar',
-        data:{ labels, datasets:[{ label:'Sales', data, backgroundColor:'green' }] }
-    });
+function updateDashboard(){
+  let daily=0, monthly=0, dailyProfit=0, monthlyProfit=0;
+  const todayStr = new Date().toLocaleDateString();
+  const currentMonth = new Date().getMonth()+1;
+  receiptHistory.forEach(r=>{
+    const rDate = new Date(r.date);
+    if(r.date===todayStr){ daily += r.total; dailyProfit += r.profit; }
+    if(rDate.getMonth()+1===currentMonth){ monthly += r.total; monthlyProfit += r.profit; }
+  });
+  document.getElementById("dailySales").innerText = daily;
+  document.getElementById("dailyProfit").innerText = dailyProfit;
+  document.getElementById("monthlySales").innerText = monthly;
+  document.getElementById("monthlyProfit").innerText = monthlyProfit;
+  renderCharts();
 }
 
-// ====================== Project Tracker ======================
+function renderCharts(){
+  const labels = receiptHistory.map(r=>r.date);
+  const data = receiptHistory.map(r=>r.total);
+  const lineCtx = document.getElementById("salesLineChart").getContext("2d");
+  const barCtx = document.getElementById("salesBarChart").getContext("2d");
+  if(lineChart) lineChart.destroy();
+  if(barChart) barChart.destroy();
+  lineChart = new Chart(lineCtx,{ type:'line', data:{ labels, datasets:[{ label:'Sales', data, borderColor:'#22c55e', fill:false }] } });
+  barChart = new Chart(barCtx,{ type:'bar', data:{ labels, datasets:[{ label:'Sales', data, backgroundColor:'#2563eb' }] } });
+}
+
+// ================= Project Tracker =================
 function addProjectMaterial(){
-    const material = document.getElementById('pMaterial').value.trim();
-    const packs = Number(document.getElementById('pPacks').value);
-    const qty = Number(document.getElementById('pQty').value);
-    const price = Number(document.getElementById('pPrice').value);
-    if(!material || packs<=0 || qty<=0 || price<=0) return alert('Invalid input');
-    const totalQty = packs*qty;
-    projectMaterials.push({ material, packs, qty, totalQty, price });
-    renderProjectMaterials();
+  const material = document.getElementById("material").value;
+  const packs = Number(document.getElementById("packs").value);
+  const qty = Number(document.getElementById("qty").value);
+  const price = Number(document.getElementById("price").value);
+  if(!material || packs<=0 || qty<=0 || price<=0) return;
+  projectMaterials.push({material,packs,qty,price,totalQty:packs*qty});
+  renderProjectMaterials();
 }
 
 function renderProjectMaterials(){
-    const tbody = document.getElementById('pTbody');
-    tbody.innerHTML = '';
-    let totalCost = 0;
-    projectMaterials.forEach((item,index)=>{
-        totalCost += item.price;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${item.material}</td>
-                        <td>${item.packs}</td>
-                        <td>${item.qty}</td>
-                        <td>${item.totalQty}</td>
-                        <td>${item.price}</td>
-                        <td><button class="btn btn-danger btn-sm" onclick="removeProjectMaterial(${index})">Remove</button></td>`;
-        tbody.appendChild(tr);
-    });
-    document.getElementById('pTotalCost').innerText = totalCost;
-    computeProjectProfit(totalCost);
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = '';
+  let total=0;
+  projectMaterials.forEach((m,i)=>{
+    total += m.price;
+    tbody.innerHTML += `<tr>
+      <td>${m.material}</td>
+      <td>${m.packs}</td>
+      <td>${m.qty}</td>
+      <td>${m.totalQty}</td>
+      <td>${m.price}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="delProjectMaterial(${i})">Delete</button></td>
+    </tr>`;
+  });
+  document.getElementById("totalCost").innerText = total;
+  computeProjectProfit();
 }
 
-function removeProjectMaterial(index){
-    projectMaterials.splice(index,1);
-    renderProjectMaterials();
+function delProjectMaterial(i){
+  projectMaterials.splice(i,1);
+  renderProjectMaterials();
 }
 
-function computeProjectProfit(cost){
-    const income = Number(document.getElementById('pIncome').value);
-    const profit = income-cost;
-    document.getElementById('pProfit').innerText = profit >=0 ? profit : 0;
+function computeProjectProfit(){
+  const income = Number(document.getElementById("income").value);
+  const totalCost = projectMaterials.reduce((sum,m)=>sum+m.price,0);
+  document.getElementById("profit").innerText = income - totalCost;
 }
 
-function saveProjectTracker(){
-    const projectName = document.getElementById('pName').value.trim();
-    const income = Number(document.getElementById('pIncome').value);
-    if(!projectName || income<=0 || projectMaterials.length===0) return alert('Invalid input');
-    const totalCost = projectMaterials.reduce((acc,i)=>acc+i.price,0);
-    const profit = income-totalCost;
-    const date = new Date().toLocaleDateString();
-    const newRef = db.ref('projects').push();
-    newRef.set({ date, projectName, income, totalCost, profit, materials: projectMaterials });
-    Swal.fire('Saved','Project saved successfully','success');
-    projectMaterials=[];
-    document.getElementById('pName').value='';
-    document.getElementById('pIncome').value='';
-    renderProjectMaterials();
-    renderProjectHistory();
+function saveProject(){
+  if(projectMaterials.length===0){ Swal.fire("Error","Add materials first","error"); return; }
+  const name = document.getElementById("projectName").value || "Unnamed Project";
+  const income = Number(document.getElementById("income").value);
+  const totalCost = projectMaterials.reduce((sum,m)=>sum+m.price,0);
+  const profit = income - totalCost;
+  const date = new Date().toISOString();
+  const projectObj = {date,name,totalCost,income,profit,materials: [...projectMaterials]};
+  db.ref('trackingProjects').push(projectObj);
+  projectHistory.push(projectObj);
+  renderProjectHistory();
+  Swal.fire("Saved",`${name} saved! Profit: ₱${profit}`,"success");
+  projectMaterials=[]; renderProjectMaterials();
+  document.getElementById("projectName").value="";
+  document.getElementById("income").value="";
 }
 
 function renderProjectHistory(){
-    const tbody = document.getElementById('pHistory');
-    tbody.innerHTML='';
-    db.ref('projects').once('value',snap=>{
-        const data = snap.val() || {};
-        Object.entries(data).forEach(([id,proj])=>{
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${proj.date}</td>
-                            <td>${proj.projectName}</td>
-                            <td>${proj.totalCost}</td>
-                            <td>${proj.income}</td>
-                            <td>${proj.profit}</td>
-                            <td>
-                                <button class="btn btn-primary btn-sm" onclick="viewProject('${id}')">View</button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteProject('${id}')">Delete</button>
-                            </td>`;
-            tbody.appendChild(tr);
-        });
-    });
+  const tbody = document.getElementById("history");
+  tbody.innerHTML = '';
+  projectHistory.forEach((p,i)=>{
+    tbody.innerHTML += `<tr>
+      <td>${new Date(p.date).toLocaleString()}</td>
+      <td>${p.name}</td>
+      <td>₱${p.totalCost}</td>
+      <td>₱${p.income}</td>
+      <td>₱${p.profit}</td>
+      <td>
+        <button class="btn btn-info btn-sm" onclick="viewProject(${i})">View</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProject(${i})">Delete</button>
+      </td>
+    </tr>`;
+  });
 }
 
-function viewProject(id){
-    db.ref('projects/'+id).once('value',snap=>{
-        const proj = snap.val();
-        if(!proj) return;
-        Swal.fire({
-            title:`${proj.projectName}`,
-            html: `<p>Income: ₱${proj.income}</p>
-                   <p>Total Cost: ₱${proj.totalCost}</p>
-                   <p>Profit: ₱${proj.profit}</p>
-                   <h5>Materials:</h5>
-                   <ul>${proj.materials.map(m=>`<li>${m.material} - ${m.packs} packs x ${m.qty} = ${m.totalQty}, Price: ₱${m.price}</li>`).join('')}</ul>`,
-            width:600
-        });
-    });
-}
-
-function deleteProject(id){
-    if(confirm('Delete this project?')){
-        db.ref('projects/'+id).remove();
-        renderProjectHistory();
-    }
-}
-
-// ====================== Initialize ======================
-document.addEventListener('DOMContentLoaded',()=>{
+// ================= Load Firebase Data =================
+window.addEventListener('load',()=>{
+  fetchReceiptsFromFirebase();
+  db.ref('trackingProjects').on('value',snap=>{
+    const data = snap.val() || {};
+    projectHistory = Object.values(data);
     renderProjectHistory();
-    updateDashboard();
+  });
 });
 </script>
 
