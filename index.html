@@ -346,18 +346,27 @@ function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
 
 // LOAD PROJECTS
 function loadProjects() {
-  projectHistory = []; // start empty
+  projectHistory = []; // reset local array
 
-  // Listen to Firebase in real-time
-  database.ref('trackingProjects').on('child_added', snap => {
-    const project = snap.val();
+  // 1. Load all existing projects from Firebase once
+  database.ref('trackingProjects').once('value')
+    .then(snapshot => {
+      const data = snapshot.val();
+      if (data) {
+        projectHistory = Object.values(data); // load all existing projects
+        renderHistory();
+      }
 
-    // Check if it's already in projectHistory (avoid duplicates)
-    if (!projectHistory.some(p => p.date === project.date && p.name === project.name)) {
-      projectHistory.push(project);
-      renderHistory();
-    }
-  });
+      // 2. Listen for new projects added in real-time
+      database.ref('trackingProjects').on('child_added', snap => {
+        const project = snap.val();
+        if (!projectHistory.some(p => p.date === project.date && p.name === project.name)) {
+          projectHistory.push(project);
+          renderHistory();
+        }
+      });
+    })
+    .catch(err => showToast("Firebase load error: " + err.message, "error"));
 }
 loadProjects(); render(); renderSRP();
 </script>
