@@ -6,8 +6,6 @@
 <title>JKM PRIME DIGITAL PRINTS - Project Tracker</title>
 <link rel="icon" href="logo.png" type="image/png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<!-- SweetAlert2 CSS -->
-<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.min.css" rel="stylesheet">
 <style>
 body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:.3s}
 .dark{background:#1e293b;color:white}
@@ -114,7 +112,7 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 <button class="btn btn-success w-100" onclick="saveProject(); return false;">SAVE PROJECT</button>
 </div>
 </div>
-</div>z
+</div>
 
 <!-- SRP TAB -->
 <div id="srpTab" style="display:none">
@@ -215,9 +213,6 @@ body{font-family:'Segoe UI',sans-serif;background:#eef1f5;color:#000;transition:
 <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-database.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<!-- SweetAlert2 JS -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.12/dist/sweetalert2.all.min.js"></script>
-
 <script>
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
@@ -247,53 +242,34 @@ const srpTotalSpan=document.getElementById("srpTotal");
 const srpSuggestedSpan=document.getElementById("srpSuggested");
 
 function showToast(msg,type='info'){const t=document.getElementById('toast'); t.innerText=msg; t.style.background=type==='error'?'#dc3545':type==='success'?'#198754':'#0d6efd'; t.style.display='block'; setTimeout(()=>{t.style.display='none'},3000);}
+
 function showTab(e,tab){e.preventDefault(); document.getElementById('materialsTab').style.display=tab==='materials'?'block':'none'; document.getElementById('srpTab').style.display=tab==='srp'?'block':'none'; document.querySelectorAll('#tabMenu .nav-link').forEach(n=>n.classList.remove('active')); e.currentTarget.classList.add('active');}
 
-// MATERIALS
+// MATERIALS FUNCTIONS
 function render(){let html="", tc=0; materials.forEach((m,i)=>{let totalQty=m.packs*m.qty; tc+=m.price; html+=`<tr><td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${totalQty}</td><td>₱${m.price.toLocaleString()}</td><td><button class="btn btn-danger btn-sm" onclick="delMaterial(${i})">Delete</button></td></tr>`}); tbody.innerHTML=html; totalCost=tc; totalCostSpan.innerText=totalCost.toLocaleString(); computeProfit();}
 function addMaterial(){let m={name:document.getElementById("material").value,packs:Number(document.getElementById("packs").value),qty:Number(document.getElementById("qty").value),price:Number(document.getElementById("price").value)}; if(!m.name||!m.packs||!m.qty||!m.price){showToast("Complete all fields","error"); return;} materials.push(m); render(); document.getElementById("material").value=""; document.getElementById("packs").value=""; document.getElementById("qty").value=""; document.getElementById("price").value="";}
 function delMaterial(i){materials.splice(i,1); render();}
 function computeProfit(){let incomeVal=Number(incomeInput.value)||0; profitSpan.innerText=(incomeVal-totalCost).toLocaleString();}
 
 // SAVE PROJECT
-function saveProject() {
-  if(materials.length === 0){
-    showToast("Add materials first","error");
-    return;
-  }
+function saveProject(){
+  if(materials.length===0){showToast("Add materials first","error"); return;}
+  let name=projectName.value||"Unnamed Project";
+  let incomeVal=Number(incomeInput.value)||0;
+  let profit=incomeVal-totalCost;
+  let date=new Date().toISOString();
+  let projectObj={date,name,totalCost,incomeVal,profit,materials:JSON.parse(JSON.stringify(materials))};
 
-  let name = projectName.value || "Unnamed Project";
-  let incomeVal = Number(incomeInput.value) || 0;
-  let date = new Date().toISOString();
+  // Save locally first
+  projectHistory.push(projectObj);
+  localStorage.setItem("projects",JSON.stringify(projectHistory));
+  renderHistory();
 
-  let projectObj = {
-    date,
-    name,
-    totalCost,
-    incomeVal,
-    profit: incomeVal - totalCost,
-    materials: JSON.parse(JSON.stringify(materials))
-  };
+  // Save to Firebase (optional)
+  database.ref('trackingProjects').push(projectObj).then(()=>{ showToast("Project saved","success"); }).catch(err=>showToast("Firebase error: "+err.message,"error"));
 
-  // Push to Firebase
-  let newRef = database.ref('trackingProjects').push();
-  projectObj.key = newRef.key; // store Firebase key
-  newRef.set(projectObj)
-    .then(() => {
-      // Add to local projectHistory
-      projectHistory.push(projectObj);
-      renderHistory();
-
-      // SweetAlert & Toast
-      Swal.fire({ icon:'success', title:'Project Saved!', text:name, timer:2000, showConfirmButton:false });
-      showToast(`Project "${name}" saved!`, "success");
-
-      // Clear inputs
-      materials = []; render();
-      projectName.value = "";
-      incomeInput.value = "";
-    })
-    .catch(err => showToast("Firebase error: "+err.message,"error"));
+  // Clear form
+  materials=[]; render(); projectName.value=""; incomeInput.value="";
 }
 
 // HISTORY
@@ -312,14 +288,19 @@ function renderHistory(){
 
 function viewProject(idx){
   const modal = new bootstrap.Modal(document.getElementById('materialsModal'));
-  const tbodyModal = document.querySelector('#modalMaterialsTable tbody'); tbodyModal.innerHTML="";
-  projectHistory[idx].materials.forEach(m=>{ let tr=document.createElement('tr'); tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`; tbodyModal.appendChild(tr); });
+  const tbody = document.querySelector('#modalMaterialsTable tbody');
+  tbody.innerHTML="";
+  projectHistory[idx].materials.forEach(m=>{
+    let tr=document.createElement('tr');
+    tr.innerHTML=`<td>${m.name}</td><td>${m.packs}</td><td>${m.qty}</td><td>${m.packs*m.qty}</td><td>₱${m.price.toLocaleString()}</td>`;
+    tbody.appendChild(tr);
+  });
   modal.show();
 }
-function editProject(idx){ const p=projectHistory[idx]; projectName.value=p.name; incomeInput.value=p.incomeVal; materials=JSON.parse(JSON.stringify(p.materials)); render();}
-function deleteProject(idx){ showConfirm("Are you sure?", r=>{ if(r){ let projectKey = projectHistory[idx].key; database.ref('trackingProjects/'+projectKey).remove().then(()=>{ showToast("Deleted","success"); }); projectHistory.splice(idx,1); renderHistory(); }});}
 
-// DARK MODE
+function editProject(idx){const p=projectHistory[idx]; projectName.value=p.name; incomeInput.value=p.incomeVal; materials=JSON.parse(JSON.stringify(p.materials)); render();}
+function deleteProject(idx){showConfirm("Are you sure?", r=>{if(r){projectHistory.splice(idx,1); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory(); showToast("Deleted","success");}});}
+
 function toggleDark(){document.body.classList.toggle('dark');}
 
 // CONFIRM
@@ -332,17 +313,16 @@ function addSRP(){ let m={name:document.getElementById("srpMaterial").value, qty
 function renderSRP(){ let html="", tc=0; srpMaterials.forEach((m,i)=>{let total=m.qty*m.price; tc+=total; html+=`<tr><td>${m.name}</td><td>${m.qty}</td><td>₱${m.price}</td><td>₱${total}</td><td><button class="btn btn-danger btn-sm" onclick="delSRP(${i})">Delete</button></td></tr>`; }); srpBody.innerHTML=html; srpTotalSpan.innerText=tc.toLocaleString(); srpSuggestedSpan.innerText=(tc*3).toLocaleString();}
 function delSRP(i){srpMaterials.splice(i,1); renderSRP();}
 
-// LOAD PROJECTS (Real-time sync)
-function loadProjects() {
-  database.ref('trackingProjects').once('value')
-    .then(snap => {
-      const data = snap.val();
-      if(data){
-        projectHistory = Object.values(data); // includes key
-        renderHistory();
-      }
-    })
-    .catch(console.log);
+// LOAD PROJECTS
+function loadProjects(){
+  projectHistory = JSON.parse(localStorage.getItem("projects")||"[]");
+  renderHistory();
+  database.ref('trackingProjects').once('value').then(snap=>{
+    const data = snap.val();
+    if(data){ Object.values(data).forEach(p=>{
+      if(!projectHistory.some(lp=>lp.date===p.date && lp.name===p.name)) projectHistory.push(p);
+    }); localStorage.setItem("projects",JSON.stringify(projectHistory)); renderHistory();}
+  }).catch(console.log);
 }
 
 loadProjects(); render(); renderSRP();
