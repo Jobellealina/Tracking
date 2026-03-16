@@ -335,18 +335,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-function fetchHistoryFromFirebase(){
-  const ref = db.ref('trackingProjects'); // o kung anong path sa Firebase
-  ref.on('value', snapshot => {
-    const data = snapshot.val() || {};
-    projectHistory = Object.values(data); // convert object to array
-    renderHistory(); // function mo para ipakita sa table
-  });
-}
-
-// Call this after Firebase initialization
-fetchHistoryFromFirebase();
-
 // Items List
 let items=[
   {name:"3R Photo Print",price:20},{name:"4R Photo Print",price:25},{name:"5R Photo Print",price:30},{name:"A4 Photo Print",price:60},{name:"Polaroid Photo Print",price:60},
@@ -872,29 +860,21 @@ function deleteProject(idx){
   });
 }
 
-// Load projects on page load
-window.addEventListener('load',()=>{
-  projectHistory = JSON.parse(localStorage.getItem("projects")||"[]");
+window.addEventListener('load', () => {
+  // Load from localStorage first
+  projectHistory = JSON.parse(localStorage.getItem("projects") || "[]");
   renderProjectHistory();
-  // Fetch from Firebase
-  firebase.database().ref('trackingProjects').on('value',snap=>{
+
+  // Single Firebase listener
+  const ref = db.ref('trackingProjects');
+  ref.on('value', snap => {
     const data = snap.val() || {};
-    projectHistory = Object.values(data);
-    renderProjectHistory();
+    projectHistory = Object.values(data); 
+    localStorage.setItem("projects", JSON.stringify(projectHistory)); // update localStorage
+    renderProjectHistory(); // correct function
   });
 });
 
-
-// Load projects from Firebase on page load
-function fetchProjectsFromFirebase(){
-  const ref = db.ref('trackingProjects');
-  ref.on('value', snapshot => {
-    const data = snapshot.val() || {};
-    projectHistory = Object.values(data);
-    renderHistory(); // show in the new tab
-  });
-}
-fetchProjectsFromFirebase();
 
 </script>
 </body>
