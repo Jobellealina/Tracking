@@ -619,6 +619,110 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+// Tracker tab init function
+function initTrackerTab() {
+  let projectMaterials = [];
+  let projectHistory = JSON.parse(localStorage.getItem("projects") || "[]");
+
+  const pTbody = document.getElementById("pTbody");
+  const pTotalCost = document.getElementById("pTotalCost");
+  const pProfit = document.getElementById("pProfit");
+  const pIncome = document.getElementById("pIncome");
+  const pName = document.getElementById("pName");
+  const pHistory = document.getElementById("pHistory");
+
+  function renderProjectMaterials() {
+    if (!pTbody) return;
+    let html = "", totalCost = 0;
+    projectMaterials.forEach((m, i) => {
+      let tQty = m.packs * m.qty;
+      totalCost += m.price;
+      html += `<tr>
+        <td>${m.name}</td>
+        <td>${m.packs}</td>
+        <td>${m.qty}</td>
+        <td>${tQty}</td>
+        <td>₱${m.price}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="delProjectMaterial(${i})">Delete</button></td>
+      </tr>`;
+    });
+    pTbody.innerHTML = html;
+    pTotalCost && (pTotalCost.innerText = totalCost);
+    computeProjectProfit();
+  }
+
+  function computeProjectProfit() {
+    if (!pProfit || !pIncome) return;
+    const income = Number(pIncome.value) || 0;
+    const totalCost = projectMaterials.reduce((sum, m) => sum + m.price, 0);
+    pProfit.innerText = income - totalCost;
+  }
+
+  window.addProjectMaterial = function () {
+    const mat = document.getElementById("pMaterial").value;
+    const packs = Number(document.getElementById("pPacks").value);
+    const qty = Number(document.getElementById("pQty").value);
+    const price = Number(document.getElementById("pPrice").value);
+    if (!mat || packs <= 0 || qty <= 0 || price <= 0) { Swal.fire("Error", "Complete all fields", "error"); return; }
+    projectMaterials.push({ name: mat, packs, qty, price });
+    renderProjectMaterials();
+    document.getElementById("pMaterial").value = "";
+    document.getElementById("pPacks").value = "";
+    document.getElementById("pQty").value = "";
+    document.getElementById("pPrice").value = "";
+  }
+
+  window.delProjectMaterial = function (i) {
+    projectMaterials.splice(i, 1);
+    renderProjectMaterials();
+  }
+
+  function renderProjectHistory() {
+    if (!pHistory) return;
+    let html = "";
+    projectHistory.forEach((p, idx) => {
+      html += `<tr>
+        <td>${new Date(p.date).toLocaleString()}</td>
+        <td>${p.name}</td>
+        <td>₱${p.totalCost}</td>
+        <td>₱${p.income}</td>
+        <td>₱${p.profit}</td>
+        <td>
+          <button class="btn btn-info btn-sm" onclick="viewProject(${idx})">View</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProject(${idx})">Delete</button>
+        </td>
+      </tr>`;
+    });
+    pHistory.innerHTML = html;
+  }
+
+  window.viewProject = function (idx) {
+    const proj = projectHistory[idx];
+    if (!proj) return;
+    const matList = proj.materials.map(m => `${m.name} - Packs:${m.packs}, Qty:${m.qty}, Price:₱${m.price}`).join("\n");
+    Swal.fire({ title: `${proj.name} Materials`, html: `<pre>${matList}</pre><br><b>Income:</b> ₱${proj.income} <br><b>Profit:</b> ₱${proj.profit}`, width: 500 });
+  }
+
+  window.deleteProject = function (idx) {
+    if (!projectHistory[idx]) return;
+    Swal.fire({ title: 'Delete Project?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes' })
+      .then(res => {
+        if (res.isConfirmed) {
+          projectHistory.splice(idx, 1);
+          localStorage.setItem("projects", JSON.stringify(projectHistory));
+          renderProjectHistory();
+          Swal.fire("Deleted", "Project removed", "success");
+        }
+      });
+  }
+
+  // Initial render
+  renderProjectHistory();
+}
+
+// Call this ONLY when tracker tab is opened
+document.getElementById("trackerTabBtn")?.addEventListener("click", initTrackerTab);
+
 </script>
 </body>
 </html>
